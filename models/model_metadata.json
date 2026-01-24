@@ -1,0 +1,51 @@
+{
+  "feature_names": [
+    "betaine_M",
+    "creatine_M",
+    "dextran_M",
+    "dmso_M",
+    "ectoin_M",
+    "ethylene_glycol_M",
+    "fbs_M",
+    "glucose_M",
+    "glycerol_M",
+    "hes_M",
+    "hsa_M",
+    "human_serum_M",
+    "hyaluronic_acid_M",
+    "methylcellulose_M",
+    "peg_M",
+    "proline_M",
+    "propylene_glycol_M",
+    "pvp_M",
+    "raffinose_M",
+    "sucrose_M",
+    "trehalose_M"
+  ],
+  "n_features": 21,
+  "trained_at": "2026-01-24T22:33:51.434174",
+  "config": {
+    "kernel_type": "matern",
+    "matern_nu": 2.5,
+    "n_restarts": 10,
+    "cv_folds": 5,
+    "random_state": 42,
+    "alpha": 1e-06
+  },
+  "metrics": {
+    "cv": {
+      "cv_rmse_mean": 20.434891834320418,
+      "cv_rmse_std": 0.9343258267611256,
+      "cv_r2_mean": 0.26632800216148805,
+      "cv_r2_std": 0.09651274376304848,
+      "n_folds": 5
+    },
+    "train": {
+      "mse": 216.47649855734144,
+      "rmse": 14.713140336357206,
+      "mae": 10.803052658088092,
+      "r2": 0.6273714997310411,
+      "mean_uncertainty": 19.453292831430094
+    }
+  }
+}
