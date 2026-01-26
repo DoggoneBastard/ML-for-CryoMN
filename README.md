@@ -10,7 +10,7 @@ Machine learning pipeline for optimizing cryoprotective formulations for cryomic
 
 ## Approach
 
-**Bayesian Optimization with Gaussian Processes**
+**Gaussian Process Regression + Bayesian Optimization**
 - Works well with limited data (~200 samples)
 - Provides uncertainty quantification
 - Supports iterative refinement with wet lab validation
@@ -27,8 +27,9 @@ python src/01_data_parsing/parse_formulations.py
 # 2. Train GP model
 python src/02_model_training/train_gp_model.py
 
-# 3. Generate optimized formulations
-python src/03_optimization/optimize_formulation.py
+# 3. Generate candidates (choose one)
+python src/03_optimization/optimize_formulation.py      # Fast random sampling
+python src/05_bo_optimization/bo_optimizer.py          # Proper BO with DE
 
 # 4. Integrate wet lab results (after experiments)
 python src/04_validation_loop/update_model.py
@@ -36,10 +37,21 @@ python src/04_validation_loop/update_model.py
 
 ## Results
 
-| Category | Best Candidate |
-|----------|----------------|
-| General (≤5% DMSO) | 78.6% viability, 0.5% DMSO |
-| DMSO-free | 77.9% viability, 0% DMSO |
+### Random Sampling (`03_optimization`)
+
+| Category | Best Candidate | Predicted Viability |
+|----------|----------------|---------------------|
+| General (≤5% DMSO) | 628mM DMSO + 6.5M hyaluronic acid | 75.1% ± 18.5% |
+| DMSO-free | 1.8M ethylene glycol + 52% FBS + 632mM HES | 72.5% ± 23.9% |
+
+### DE-based BO (`05_bo_optimization`)
+
+| Category | Best Candidate | Expected Improvement |
+|----------|----------------|----------------------|
+| General (≤5% DMSO) | 10-ingredient formulation | EI = 0.845 |
+| DMSO-free | 10-ingredient formulation | EI = 0.845 |
+
+> **Note**: DE-based BO prioritizes *informative* experiments (high uncertainty) over highest predicted mean.
 
 See `results/` for full candidate lists.
 
@@ -48,22 +60,30 @@ See `results/` for full candidate lists.
 ```
 ├── data/
 │   ├── raw/                    # Original literature data
-│   ├── processed/              # Parsed formulations (200 rows)
+│   ├── processed/              # Parsed formulations (~200 rows)
 │   └── validation/             # Wet lab results template
-├── models/                     # Trained GP model
+├── models/                     # Trained GP model + scaler
 ├── results/                    # Optimized candidate formulations
-├── src/
-│   ├── 01_data_parsing/        # Parse CSV, normalize units
-│   ├── 02_model_training/      # Train GP regression model
-│   ├── 03_optimization/        # Bayesian optimization
-│   └── 04_validation_loop/     # Integrate wet lab feedback
-└── requirements.txt
+└── src/
+    ├── 01_data_parsing/        # Parse CSV, normalize units, merge synonyms
+    ├── 02_model_training/      # Train GP regression model (Matérn kernel)
+    ├── 03_optimization/        # Random sampling + GP prediction (fast)
+    ├── 04_validation_loop/     # Integrate wet lab feedback, retrain model
+    └── 05_bo_optimization/     # Proper BO with Differential Evolution
 ```
+
+## Module Descriptions
+
+| Module | Method | Best For |
+|--------|--------|----------|
+| `03_optimization` | Random sampling, ranks by highest predicted mean | Quick generation, when speed matters |
+| `05_bo_optimization` | Differential Evolution, maximizes Expected Improvement | Most informative experiments, exploration-exploitation balance |
 
 ## Key Features
 
-- **27 ingredients** tracked (DMSO, trehalose, glycerol, etc.)
+- **21 ingredients** tracked (DMSO, trehalose, glycerol, FBS, etc.)
 - **Synonym merging** (e.g., FBS = FCS = fetal bovine serum)
 - **Unit normalization** (all concentrations converted to molar)
 - **Uncertainty quantification** (GP provides confidence intervals)
 - **Iterative refinement** (model improves with each wet lab validation)
+- **Two optimization modes**: Fast random sampling OR proper Bayesian optimization
