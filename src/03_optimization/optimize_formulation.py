@@ -544,7 +544,7 @@ def main():
     export_candidates(
         dmso_free_candidates,
         feature_names,
-        os.path.join(output_dir, 'candidates_dmso_free.csv')``
+        os.path.join(output_dir, 'candidates_dmso_free.csv')
     )
     
     # Print top candidates
