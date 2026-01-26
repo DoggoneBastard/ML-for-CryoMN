@@ -1,0 +1,65 @@
+================================================================================
+CryoMN Bayesian Optimization Candidates (DE-based)
+Generated: 2026-01-26 16:15
+================================================================================
+
+Rank 1: 4.69M dextran + 1.73M ethylene_glycol + 7.27M fbs + 1.91M glycerol + 5.19M hes + 4.70M hsa + 41.79M human_serum + 7.58M hyaluronic_acid + 7.01M peg + 1.87M pvp
+  Expected Improvement: 0.8452
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 2: 2.23M dextran + 1.28M ethylene_glycol + 58.08M fbs + 1.55M glycerol + 6.65M hes + 4.83M hsa + 46.99M human_serum + 2.91M hyaluronic_acid + 3.54M peg + 6.34M pvp
+  Expected Improvement: 0.8452
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 3: 5.09M dextran + 1.79M ethylene_glycol + 80.47M fbs + 1.79M glycerol + 9.54M hes + 7.27M hsa + 30.32M human_serum + 4.74M hyaluronic_acid + 7.28M peg + 4.99M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 4: 2.07M dextran + 29.41M fbs + 1.68M glycerol + 2.96M hes + 7.40M hsa + 22.33M human_serum + 5.02M hyaluronic_acid + 5.59M peg + 1.87M propylene_glycol + 9.39M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 5: 4.48M dextran + 1.90M ethylene_glycol + 45.30M fbs + 2.43M glycerol + 8.93M hes + 4.07M hsa + 62.70M human_serum + 8.37M hyaluronic_acid + 9.27M peg + 4.89M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 6: 2.30M dextran + 56.92M fbs + 1.53M glycerol + 8.97M hes + 9.80M hsa + 33.88M human_serum + 6.50M hyaluronic_acid + 9.73M peg + 1.43M propylene_glycol + 5.46M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 7: 2.13M dextran + 1.98M ethylene_glycol + 88.97M fbs + 6.49M hes + 4.77M hsa + 70.42M human_serum + 1.85M hyaluronic_acid + 7.15M peg + 1.37M propylene_glycol + 3.96M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 8: 6.21M dextran + 1.30M ethylene_glycol + 49.59M fbs + 1.59M glycerol + 7.52M hes + 4.63M hsa + 51.26M human_serum + 3.11M hyaluronic_acid + 5.33M peg + 1.26M propylene_glycol
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 9: 5.00M dextran + 45.83M fbs + 1.68M glycerol + 7.40M hes + 9.82M hsa + 17.63M human_serum + 6.12M hyaluronic_acid + 4.79M peg + 1.83M propylene_glycol + 4.95M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 10: 7.28M dextran + 1.27M ethylene_glycol + 11.33M fbs + 6.91M hes + 9.49M hsa + 56.43M human_serum + 3.71M hyaluronic_acid + 1.87M peg + 2.14M propylene_glycol + 2.37M pvp
+  Expected Improvement: 0.8451
+  Predicted viability: 63.2% ± 25.5%
+  DMSO: 0.0%
+  Ingredients: 10
+

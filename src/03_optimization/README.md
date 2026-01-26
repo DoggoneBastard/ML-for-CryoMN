@@ -1,11 +1,10 @@
-# Step 3: Bayesian Optimization
+# Step 3: Candidate Generation via Random Sampling
 
 ## Overview
 
-This module performs multi-objective Bayesian optimization to discover optimal cryoprotective formulations with:
-1. **Minimized DMSO usage** (≤5% or DMSO-free)
-2. **Maximized viability** (target ≥70%)
-3. **Limited ingredients** (≤10 components)
+This module generates candidate cryoprotective formulations using **random sampling + GP prediction**. It provides a fast way to explore the formulation space, though it uses pure exploitation (no exploration-exploitation balance).
+
+> **Note**: For proper Bayesian optimization with acquisition-guided search, see [`05_bo_optimization`](../05_bo_optimization/README.md).
 
 ## Usage
 
@@ -25,13 +24,14 @@ python src/03_optimization/optimize_formulation.py
 - `results/candidates_dmso_free.csv` - DMSO-free candidates
 - `*_summary.txt` - Human-readable summaries
 
-## Optimization Approach
+## Algorithm
 
-### Acquisition Function
-
-**Expected Improvement (EI)** - Balances exploration and exploitation:
-- Explores uncertain regions (high variance)
-- Exploits promising regions (high mean)
+1. Load trained GP model
+2. Generate large pool of random formulations (50× target count)
+3. Filter by constraints (max DMSO, max ingredients)
+4. Use GP to predict viability for each candidate
+5. Rank by predicted viability (highest mean)
+6. Select top-N candidates
 
 ### Constraints
 
@@ -41,14 +41,20 @@ python src/03_optimization/optimize_formulation.py
 | Max ingredients | 10 |
 | Min viability | 70% (target) |
 
-### Algorithm
+## Comparison with Proper BO
 
-1. Load trained GP model
-2. Initialize optimizer with constraints
-3. Use Differential Evolution for global search
-4. Apply Expected Improvement acquisition
-5. Generate top-N candidate formulations
-6. Export results with uncertainty estimates
+| Aspect | This Module (03) | Proper BO (05) |
+|--------|------------------|----------------|
+| **Method** | Random sampling | Differential Evolution |
+| **Selection** | Highest predicted mean | Highest Expected Improvement |
+| **Exploration** | None (pure exploitation) | Balanced via uncertainty |
+| **Speed** | Fast (~seconds) | Slower (~minutes) |
+| **Best for** | Quick generation | Most informative experiments |
+
+### Why the difference matters
+
+- **This module** always suggests what the model thinks will work best *right now*
+- **Proper BO** suggests what would be most *informative* to test, including uncertain regions that might reveal better formulations
 
 ## Output Format
 
