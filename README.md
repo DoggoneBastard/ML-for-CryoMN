@@ -80,7 +80,10 @@ See `results/` for full candidate lists.
 
 | Module | Method | Best For |
 |--------|--------|----------|
+| `01_data_parsing` | Data Parsing & Normalization | Preparing clean, structured training data from raw literature |
+| `02_model_training` | Gaussian Process Regression (Matérn Kernel) | Learning the viability landscape from limited data |
 | `03_optimization` | Random sampling, ranks by highest predicted mean | Quick generation, when speed matters |
+| `04_validation_loop` | Data merging & Model Retraining | Closing the active learning loop with wet lab feedback |
 | `05_bo_optimization` | Differential Evolution, maximizes Expected Improvement | Most informative experiments, exploration-exploitation balance |
 | `06_explainability` | SHAP, PDPs, Interaction Contours | Understanding model drivers and ensuring trust |
 
