@@ -8,7 +8,7 @@ This module generates comprehensive visualizations to explain how the Gaussian P
 
 ```bash
 cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
-python src/06_explainability/explainability.py
+python3 src/06_explainability/explainability.py
 ```
 
 ## Input
