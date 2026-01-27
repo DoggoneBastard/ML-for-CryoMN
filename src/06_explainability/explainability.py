@@ -171,7 +171,7 @@ def plot_feature_importance(importance_df: pd.DataFrame, output_dir: str,
     
     plt.tight_layout()
     output_path = os.path.join(output_dir, 'feature_importance.png')
-    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
     plt.close()
     
     print(f"  ✓ Feature importance chart saved: {output_path}")
@@ -242,7 +242,7 @@ def plot_shap_summary(shap_values: np.ndarray, X_explain: np.ndarray,
         plt.title('SHAP Summary: Feature Impact on Viability', fontsize=14, fontweight='bold')
         
         output_path = os.path.join(output_dir, 'shap_summary.png')
-        plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+        plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
         plt.close()
         
         print(f"  ✓ SHAP summary plot saved: {output_path}")
@@ -254,7 +254,7 @@ def plot_shap_summary(shap_values: np.ndarray, X_explain: np.ndarray,
         plt.title('SHAP Feature Importance', fontsize=14, fontweight='bold')
         
         output_path = os.path.join(output_dir, 'shap_importance.png')
-        plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+        plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
         plt.close()
         
         print(f"  ✓ SHAP importance plot saved: {output_path}")
@@ -343,7 +343,7 @@ def plot_partial_dependence(gp: GaussianProcessRegressor, scaler: StandardScaler
     plt.tight_layout()
     
     output_path = os.path.join(output_dir, 'partial_dependence_plots.png')
-    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
     plt.close()
     
     print(f"  ✓ Partial dependence plots saved: {output_path}")
@@ -427,7 +427,7 @@ def plot_interaction_contours(gp: GaussianProcessRegressor, scaler: StandardScal
     plt.tight_layout()
     
     output_path = os.path.join(output_dir, 'interaction_contours.png')
-    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
     plt.close()
     
     print(f"  ✓ Interaction contour plots saved: {output_path}")
@@ -531,7 +531,7 @@ def plot_acquisition_landscape(gp: GaussianProcessRegressor, scaler: StandardSca
     plt.tight_layout()
     
     output_path = os.path.join(output_dir, 'acquisition_landscape.png')
-    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
     plt.close()
     
     print(f"  ✓ Acquisition landscape saved: {output_path}")
@@ -625,7 +625,7 @@ def plot_uncertainty_analysis(gp: GaussianProcessRegressor, scaler: StandardScal
     plt.tight_layout()
     
     output_path = os.path.join(output_dir, 'uncertainty_analysis.png')
-    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
+    plt.savefig(output_path, dpi=config.dpi, bbox_inches='tight', transparent=True)
     plt.close()
     
     print(f"  ✓ Uncertainty analysis saved: {output_path}")
