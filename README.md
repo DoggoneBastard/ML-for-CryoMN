@@ -33,6 +33,9 @@ python src/05_bo_optimization/bo_optimizer.py          # Proper BO with DE
 
 # 4. Integrate wet lab results (after experiments)
 python src/04_validation_loop/update_model.py
+
+# 5. Explain model predictions
+python src/06_explainability/explainability.py
 ```
 
 ## Results
@@ -69,7 +72,8 @@ See `results/` for full candidate lists.
     ├── 02_model_training/      # Train GP regression model (Matérn kernel)
     ├── 03_optimization/        # Random sampling + GP prediction (fast)
     ├── 04_validation_loop/     # Integrate wet lab feedback, retrain model
-    └── 05_bo_optimization/     # Proper BO with Differential Evolution
+    ├── 05_bo_optimization/     # Proper BO with Differential Evolution
+    └── 06_explainability/      # Generate SHAP and explainability plots
 ```
 
 ## Module Descriptions
@@ -78,6 +82,7 @@ See `results/` for full candidate lists.
 |--------|--------|----------|
 | `03_optimization` | Random sampling, ranks by highest predicted mean | Quick generation, when speed matters |
 | `05_bo_optimization` | Differential Evolution, maximizes Expected Improvement | Most informative experiments, exploration-exploitation balance |
+| `06_explainability` | SHAP, PDPs, Interaction Contours | Understanding model drivers and ensuring trust |
 
 ## Key Features
 
@@ -86,4 +91,5 @@ See `results/` for full candidate lists.
 - **Unit normalization** (all concentrations converted to molar)
 - **Uncertainty quantification** (GP provides confidence intervals)
 - **Iterative refinement** (model improves with each wet lab validation)
+- **Explainable AI** (SHAP and partial dependence plots to interpret Black Box GP)
 - **Two optimization modes**: Fast random sampling OR proper Bayesian optimization
