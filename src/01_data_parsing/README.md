@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module parses cryoprotective solution formulation data from literature-derived CSV files. It extracts ingredients, normalizes concentrations to molar units, and handles ingredient synonym merging.
+This module parses cryoprotective solution formulation data from literature-derived CSV files. It extracts ingredients, normalizes concentrations, and handles ingredient synonym merging. Ingredients are categorized as either molar-convertible or percentage-only based on their molecular properties.
 
 ## Usage
 
@@ -28,9 +28,37 @@ python src/01_data_parsing/parse_formulations.py
   - `viability_percent` - Extracted viability value
   - `dmso_percent` - DMSO percentage
   - `source_doi` - Literature source
-  - `{ingredient}_M` - Molar concentration for each ingredient
+  - `{ingredient}_M` - Molar concentration (for molar-convertible ingredients)
+  - `{ingredient}_pct` - Percentage concentration (for percentage-only ingredients)
 
 ## Features
+
+### Dual Unit System
+
+Ingredients are categorized by their molecular properties:
+
+| Unit Type | Suffix | Examples |
+|-----------|--------|----------|
+| Molar | `_M` | DMSO, trehalose, glycerol, sucrose, ethylene glycol |
+| Percentage | `_pct` | FBS, HSA, HES, PEG variants, PVP, hyaluronic acid |
+
+### PEG Molecular Weight Handling
+
+PEG is tracked as **individual MW-specific ingredients** to capture the different cryoprotective behaviors:
+
+| Ingredient | MW Range | Behavior |
+|------------|----------|----------|
+| `peg_400` | 400 Da | Cell penetrating (low MW) |
+| `peg_600` | 600 Da | Cell penetrating (low MW) |
+| `peg_1k` | 1,000 Da | Cell penetrating (low MW) |
+| `peg_1500` | 1,500 Da | Intermediate |
+| `peg_3350` | 3,350 Da | Intermediate (default for generic "PEG") |
+| `peg_5k` | 5,000 Da | Intermediate |
+| `peg_10k` | 10,000 Da | Intermediate |
+| `peg_20k` | 20,000 Da | Non-penetrating (high MW) |
+| `peg_35k` | 35,000 Da | Non-penetrating (high MW) |
+
+Generic "PEG" mentions without MW specification default to `peg_3350` (most common lab grade).
 
 ### Ingredient Synonym Mapping
 
@@ -42,15 +70,19 @@ The parser merges equivalent ingredient names:
 | `ethylene_glycol` | EG, ethylene glycol |
 | `propylene_glycol` | 1,2-propanediol, PROH, PG |
 | `fbs` | FBS, FCS, fetal bovine serum |
-| `hsa` | HSA, human albumin, BSA |
+| `hsa` | HSA, human albumin, BSA, albumin |
 | `hes` | HES, hydroxyethyl starch, HES450 |
+| `hyaluronic_acid` | HMW-HA, hyaluronic acid |
 
 ### Unit Conversion
 
-Concentrations are converted to molar (M):
+For molar-convertible ingredients:
 - `%` → M (using molecular weight and density)
 - `mM` → M (÷ 1000)
 - `mg/mL` → M (using molecular weight)
+
+For percentage-only ingredients:
+- Values are kept as-is (percentage)
 
 ### Culture Media Exclusion
 
@@ -60,12 +92,19 @@ The following are excluded as separate variables:
 
 ### Duplicate Detection
 
-The script identifies identical formulations with different viabilities and prompts for user resolution.
+The script identifies identical formulations with different viabilities and averages their values automatically.
 
 ## Example Output
 
 ```csv
-formulation_id,viability_percent,dmso_percent,source_doi,dmso_M,trehalose_M,glycerol_M,...
-1,82.5,10.0,10.1038/srep09596,1.409,0.0,0.0,...
-2,77.0,0.0,10.1002/term.2175,0.0,0.3,0.2,...
+formulation_id,viability_percent,dmso_percent,source_doi,dmso_M,trehalose_M,fbs_pct,peg_3350_pct,peg_400_pct,...
+1,82.5,10.0,10.1038/srep09596,1.409,0.0,0.0,0.0,0.0,...
+2,55.0,0.0,10.1186/s40824-023-00356-z,0.0,0.0,0.0,0.0,10.0,...
 ```
+
+## Current Statistics
+
+- **Total formulations**: 198 unique (after duplicate averaging)
+- **Unique ingredients**: 34
+- **Molar ingredients**: 14 (dmso, trehalose, glycerol, sucrose, etc.)
+- **Percentage ingredients**: 20 (fbs, hsa, hes, peg_400, peg_3350, peg_20k, pvp, etc.)

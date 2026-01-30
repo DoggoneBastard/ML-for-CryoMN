@@ -36,8 +36,24 @@ INGREDIENT_SYNONYMS = {
     'maltose': ['maltose'],
     'raffinose': ['raffinose'],
     
-    # Polymers
-    'peg': ['peg', 'polyethylene glycol'],
+    # Polymers - PEG split by molecular weight (individual MWs as separate ingredients)
+    # Low MW PEG (≤1000 Da): cell penetrating
+    'peg_400': ['peg 400', 'peg-400', 'peg400'],
+    'peg_600': ['peg 600', 'peg-600', 'peg600'],
+    'peg_1k': ['peg 1k', 'peg-1k', 'peg1k', 'peg 1000', 'peg-1000', 'peg1000'],
+    # Medium MW PEG (1.5K-10K Da): intermediate behavior
+    'peg_1500': ['peg 1.5k', 'peg-1.5k', 'peg1.5k', 'peg 1500', 'peg-1500'],
+    'peg_2k': ['peg 2k', 'peg-2k', 'peg2k', 'peg 2000', 'peg-2000'],
+    'peg_3350': ['peg 3.35k', 'peg-3.35k', 'peg 3350', 'peg-3350'],
+    'peg_4k': ['peg 4k', 'peg-4k', 'peg4k', 'peg 4000', 'peg-4000'],
+    'peg_5k': ['peg 5k', 'peg-5k', 'peg5k', 'peg 5000', 'peg-5000'],
+    'peg_6k': ['peg 6k', 'peg-6k', 'peg6k', 'peg 6000', 'peg-6000'],
+    'peg_8k': ['peg 8k', 'peg-8k', 'peg8k', 'peg 8000', 'peg-8000'],
+    'peg_10k': ['peg 10k', 'peg-10k', 'peg10k', 'peg 10000', 'peg-10000'],
+    # High MW PEG (>10K Da): non-penetrating, extracellular CPA
+    'peg_20k': ['peg 20k', 'peg-20k', 'peg20k', 'peg 20000', 'peg-20000'],
+    'peg_35k': ['peg 35k', 'peg-35k', 'peg35k', 'peg 35000', 'peg-35000'],
+    # Generic PEG (unspecified MW, default to common 3350 grade)
     'pvp': ['pvp', 'polyvinylpyrrolidone'],
     'pva': ['pva', 'polyvinyl alcohol'],
     'hes': ['hes', 'hydroxyethyl starch', 'hes450', 'hydroxychyl starch', 'hydroxyethylstarch'],
@@ -48,7 +64,7 @@ INGREDIENT_SYNONYMS = {
     # Proteins and sera
     'fbs': ['fbs', 'fcs', 'fetal bovine serum', 'fetal calf serum'],
     'human_serum': ['hs', 'human serum'],
-    'hsa': ['hsa', 'human albumin', 'human serum albumin', 'has', 'albumin', 'bsa', 'bovine serum albumin'],
+    'hsa': ['hsa', 'human albumin', 'human serum albumin', 'albumin', 'bsa', 'bovine serum albumin'],
     
     # Amino acids and compatible solutes
     'proline': ['proline', 'l-proline'],
@@ -59,7 +75,7 @@ INGREDIENT_SYNONYMS = {
     
     # Other additives
     'methylcellulose': ['mc', 'methylcellulose'],
-    'hyaluronic_acid': ['ha', 'hmw-ha', 'hyaluronic acid'],
+    'hyaluronic_acid': ['hmw-ha', 'hyaluronic acid'],
     'creatine': ['creatine'],
     'acetamide': ['acetamide'],
     'sericin': ['sericin'],
@@ -108,6 +124,26 @@ DENSITIES = {
 }
 
 # =============================================================================
+# PERCENTAGE-ONLY INGREDIENTS
+# Ingredients that cannot/should not be converted to molar concentrations.
+# These will retain percentage (%) units in the output with _pct suffix.
+# =============================================================================
+
+PERCENTAGE_ONLY_INGREDIENTS = {
+    # Sera and proteins (complex mixtures, no defined MW)
+    'fbs', 'human_serum', 'hsa', 'sericin',
+    # Polymers - PEG by specific MW (individual ingredients)
+    'peg_400', 'peg_600', 'peg_1k',  # Low MW
+    'peg_1500', 'peg_2k', 'peg_3350', 'peg_4k', 'peg_5k', 'peg_6k', 'peg_8k', 'peg_10k',  # Medium MW
+    'peg_20k', 'peg_35k',  # High MW
+    # Other polymers
+    'pvp', 'pva', 'hes', 'dextran', 'ficoll',
+    'methylcellulose', 'hyaluronic_acid',
+    # Polyampholytes and other complex molecules
+    'cooh_pll', 'peg_pa', 'pentaisomaltose',
+}
+
+# =============================================================================
 # CULTURE MEDIA TO EXCLUDE (not counted as separate ingredients)
 # =============================================================================
 
@@ -145,6 +181,10 @@ def extract_concentration(text: str, ingredient: str) -> Tuple[Optional[float], 
         
         # "10% (v/v) DMSO"
         rf'(\d+\.?\d*)\s*%\s*\(?v/v\)?\s*{re.escape(ingredient_lower)}',
+        
+        # "PEG 400 (10 wt% in DMEM)" - ingredient followed by (X wt% ...)
+        rf'{re.escape(ingredient_lower)}\s*\(\s*(\d+\.?\d*)\s*(?:wt%|wt\s*%|w/v%)',
+        rf'{re.escape(ingredient_lower)}\s*\(\s*(\d+\.?\d*)\s*%',
         
         # "0.5M trehalose", "0.5 M trehalose"
         rf'(\d+\.?\d*)\s*[mM]\s*{re.escape(ingredient_lower)}',
@@ -229,7 +269,74 @@ def convert_to_molar(value: float, unit: str, ingredient: str) -> Optional[float
     return None
 
 
-def parse_formulation_text(text: str) -> Dict[str, float]:
+def classify_peg_mw(text: str) -> Optional[str]:
+    """
+    Classify PEG molecular weight from text.
+    
+    Args:
+        text: Text containing PEG mention (e.g., "PEG 400", "PEG-20K", "polyethylene glycol")
+        
+    Returns:
+        Specific PEG MW name (e.g., 'peg_400', 'peg_3350', 'peg_20k'), or None if no PEG found.
+        For generic 'PEG' without MW, returns 'peg_3350' (most common lab grade).
+    """
+    text_lower = text.lower()
+    
+    # Check if PEG is mentioned at all
+    if 'peg' not in text_lower and 'polyethylene glycol' not in text_lower:
+        return None
+    
+    # Pattern to extract MW: "PEG 400", "PEG-1K", "PEG 20000", "PEG-1.5k"
+    # Matches: peg[space/-]?[number][k/K]?
+    mw_pattern = r'peg[\s\-]?(\d+\.?\d*)\s*([kK])?'
+    match = re.search(mw_pattern, text, re.IGNORECASE)
+    
+    if match:
+        mw_value = float(match.group(1))
+        multiplier = match.group(2)
+        
+        # Convert to Da if 'k' or 'K' suffix
+        if multiplier and multiplier.lower() == 'k':
+            mw_da = mw_value * 1000
+        else:
+            mw_da = mw_value
+        
+        # Map to specific PEG ingredient name based on MW
+        if mw_da <= 450:
+            return 'peg_400'
+        elif mw_da <= 800:
+            return 'peg_600'
+        elif mw_da <= 1200:
+            return 'peg_1k'
+        elif mw_da <= 1800:
+            return 'peg_1500'
+        elif mw_da <= 2500:
+            return 'peg_2k'
+        elif mw_da <= 4000:
+            return 'peg_3350'
+        elif mw_da <= 4500:
+            return 'peg_4k'
+        elif mw_da <= 7000:
+            return 'peg_5k'
+        elif mw_da <= 7500:
+            return 'peg_6k'
+        elif mw_da <= 9000:
+            return 'peg_8k'
+        elif mw_da <= 15000:
+            return 'peg_10k'
+        elif mw_da <= 30000:
+            return 'peg_20k'
+        else:
+            return 'peg_35k'
+    
+    # Generic "PEG" or "polyethylene glycol" without MW -> default to peg_3350 (common grade)
+    if 'peg' in text_lower or 'polyethylene glycol' in text_lower:
+        return 'peg_3350'
+    
+    return None
+
+
+def parse_formulation_text(text: str) -> Dict[str, Tuple[float, str]]:
     """
     Parse a formulation text to extract all ingredients and their concentrations.
     
@@ -237,7 +344,8 @@ def parse_formulation_text(text: str) -> Dict[str, float]:
         text: Free-text formulation description
         
     Returns:
-        Dictionary mapping canonical ingredient names to molar concentrations
+        Dictionary mapping canonical ingredient names to (value, unit_type) tuples
+        where unit_type is 'M' for molar or '%' for percentage
     """
     if pd.isna(text) or not text.strip():
         return {}
@@ -251,18 +359,36 @@ def parse_formulation_text(text: str) -> Dict[str, float]:
             if syn.lower() in text_lower:
                 value, unit = extract_concentration(text, syn)
                 if value is not None:
-                    molar = convert_to_molar(value, unit, canonical)
-                    if molar is not None:
-                        ingredients[canonical] = molar
+                    # Check if this ingredient should remain as percentage
+                    if canonical in PERCENTAGE_ONLY_INGREDIENTS:
+                        # Keep as percentage, don't attempt molar conversion
+                        ingredients[canonical] = (value, '%')
                     else:
-                        # Store raw value with unit indicator as negative (for review)
-                        # Actually, let's store as-is and mark for review
-                        ingredients[canonical] = value  # Store raw for now
+                        molar = convert_to_molar(value, unit, canonical)
+                        if molar is not None:
+                            ingredients[canonical] = (molar, 'M')
+                        else:
+                            # Fallback to percentage if conversion fails
+                            ingredients[canonical] = (value, '%')
                     break
                 else:
                     # Ingredient mentioned but no concentration found
                     # Check if it's a qualitative mention (just presence)
                     pass
+    
+    # Special handling for generic "PEG" or "polyethylene glycol" mentions
+    # that weren't caught by specific MW synonyms
+    if not any(k.startswith('peg_') for k in ingredients.keys()):
+        if 'peg' in text_lower or 'polyethylene glycol' in text_lower:
+            # Try to classify by MW from text
+            peg_category = classify_peg_mw(text)
+            if peg_category:
+                # Extract concentration for generic "peg" or "polyethylene glycol"
+                value, unit = extract_concentration(text, 'peg')
+                if value is None:
+                    value, unit = extract_concentration(text, 'polyethylene glycol')
+                if value is not None:
+                    ingredients[peg_category] = (value, '%')
     
     return ingredients
 
@@ -385,8 +511,9 @@ def parse_csv(input_path: str) -> pd.DataFrame:
     viability_col = df.columns[3]  # "Viability"
     source_col = df.columns[8] if len(df.columns) > 8 else None  # "Source (DOI link)"
     
-    # Collect all unique ingredients across all formulations
-    all_ingredients = set()
+    # Collect all unique ingredients with their unit types
+    # Dict[ingredient_name, unit_type] where unit_type is 'M' or '%'
+    all_ingredients: Dict[str, str] = {}
     parsed_rows = []
     
     print("Parsing formulations...")
@@ -405,7 +532,7 @@ def parse_csv(input_path: str) -> pd.DataFrame:
         if viability is None:
             continue
         
-        # Parse ingredients
+        # Parse ingredients (now returns Dict[str, Tuple[float, str]])
         ingredients = parse_formulation_text(formulation_text)
         
         # Also get DMSO from dedicated column for accuracy
@@ -414,13 +541,15 @@ def parse_csv(input_path: str) -> pd.DataFrame:
             formulation_text
         )
         
-        # Convert DMSO % to molar
+        # Convert DMSO % to molar (DMSO is always molar)
         if dmso_pct > 0:
             dmso_molar = (dmso_pct / 100.0) * 1.10 * 1000 / 78.13
-            ingredients['dmso'] = dmso_molar
+            ingredients['dmso'] = (dmso_molar, 'M')
         
-        # Track all ingredients
-        all_ingredients.update(ingredients.keys())
+        # Track all ingredients with their unit types
+        for ingredient, (value, unit_type) in ingredients.items():
+            if ingredient not in all_ingredients:
+                all_ingredients[ingredient] = unit_type
         
         # Get source DOI
         source = row[source_col] if source_col and pd.notna(row[source_col]) else ''
@@ -438,6 +567,7 @@ def parse_csv(input_path: str) -> pd.DataFrame:
     print(f"Found {len(all_ingredients)} unique ingredients")
     
     # Create output DataFrame with one column per ingredient
+    # Use correct suffix based on unit type: _M for molar, _pct for percentage
     output_data = []
     for row in parsed_rows:
         row_data = {
@@ -447,10 +577,14 @@ def parse_csv(input_path: str) -> pd.DataFrame:
             'source_doi': row['source_doi'],
         }
         
-        # Add each ingredient column
-        for ingredient in sorted(all_ingredients):
-            col_name = f'{ingredient}_M'
-            row_data[col_name] = row['ingredients'].get(ingredient, 0.0)
+        # Add each ingredient column with appropriate suffix
+        for ingredient in sorted(all_ingredients.keys()):
+            unit_type = all_ingredients[ingredient]
+            suffix = '_pct' if unit_type == '%' else '_M'
+            col_name = f'{ingredient}{suffix}'
+            # Get value from ingredients dict, default to 0.0
+            ing_data = row['ingredients'].get(ingredient)
+            row_data[col_name] = ing_data[0] if ing_data else 0.0
         
         output_data.append(row_data)
     
@@ -466,8 +600,8 @@ def find_duplicate_formulations(df: pd.DataFrame) -> List[Tuple[int, int, float,
     Returns:
         List of tuples: (row_idx1, row_idx2, viability1, viability2)
     """
-    # Get ingredient columns
-    ingredient_cols = [c for c in df.columns if c.endswith('_M')]
+    # Get ingredient columns (both molar and percentage)
+    ingredient_cols = [c for c in df.columns if c.endswith('_M') or c.endswith('_pct')]
     
     duplicates = []
     seen = {}
@@ -510,8 +644,8 @@ def auto_resolve_duplicates(df: pd.DataFrame, duplicates: List[Tuple], interacti
     
     print(f"\nFound {len(duplicates)} pairs of formulations with identical ingredients but different viabilities.")
     
-    # Get ingredient columns
-    ingredient_cols = [c for c in df.columns if c.endswith('_M')]
+    # Get ingredient columns (both molar and percentage)
+    ingredient_cols = [c for c in df.columns if c.endswith('_M') or c.endswith('_pct')]
     
     # Group all rows by their ingredient profile
     profile_groups = defaultdict(list)
@@ -597,12 +731,15 @@ def main():
     print(f"Formulations with <5% DMSO: {(df['dmso_percent'] < 5).sum()}")
     
     # List ingredients
-    ingredient_cols = [c for c in df.columns if c.endswith('_M')]
+    ingredient_cols = [c for c in df.columns if c.endswith('_M') or c.endswith('_pct')]
     print(f"\nIngredients detected ({len(ingredient_cols)}):")
     for col in sorted(ingredient_cols):
         non_zero = (df[col] > 0).sum()
         if non_zero > 0:
-            print(f"  - {col.replace('_M', '')}: {non_zero} formulations")
+            # Show unit type in the summary
+            unit_label = '(%)' if col.endswith('_pct') else '(M)'
+            ingredient_name = col.replace('_M', '').replace('_pct', '')
+            print(f"  - {ingredient_name} {unit_label}: {non_zero} formulations")
 
 
 if __name__ == '__main__':

@@ -125,7 +125,7 @@ def load_model_and_data(project_root: str) -> Tuple[GaussianProcessRegressor,
 
 def clean_feature_name(name: str) -> str:
     """Clean feature name for display."""
-    return name.replace('_M', '').replace('_', ' ').title()
+    return name.replace('_M', '').replace('_pct', '').replace('_', ' ').title()
 
 
 # =============================================================================
@@ -368,7 +368,7 @@ def plot_interaction_contours(gp: GaussianProcessRegressor, scaler: StandardScal
     # Get feature indices (handle _M suffix)
     feature_indices = {}
     for name in feature_names:
-        clean = name.replace('_M', '')
+        clean = name.replace('_M', '').replace('_pct', '')
         feature_indices[clean] = feature_names.index(name)
     
     # Generate pairs
@@ -462,7 +462,7 @@ def plot_acquisition_landscape(gp: GaussianProcessRegressor, scaler: StandardSca
     # Get feature indices
     feature_indices = {}
     for name in feature_names:
-        clean = name.replace('_M', '')
+        clean = name.replace('_M', '').replace('_pct', '')
         feature_indices[clean] = feature_names.index(name)
     
     feat1, feat2 = top_features[0], top_features[1]

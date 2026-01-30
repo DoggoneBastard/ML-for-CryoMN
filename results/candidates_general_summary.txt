@@ -1,55 +1,55 @@
 ================================================================================
 CryoMN Optimized Formulation Candidates
-Generated: 2026-01-26 15:27
+Generated: 2026-01-30 12:33
 ================================================================================
 
-Rank 1: 628.0mM dmso + 6.46M hyaluronic_acid
-  Predicted viability: 75.1% ± 18.5%
-  DMSO: 4.5%
-  Ingredients: 2
-
-Rank 2: 1.83M ethylene_glycol + 52.17M fbs + 631.5mM hes
-  Predicted viability: 72.5% ± 23.9%
+Rank 1: 1.83M ethylene_glycol + 52.2% fbs + 0.6% hes
+  Predicted viability: 72.4% ± 23.6%
   DMSO: 0.0%
   Ingredients: 3
 
-Rank 3: 472.0mM hes + 86.53M human_serum
-  Predicted viability: 72.0% ± 24.3%
+Rank 2: 0.5% hes + 86.5% human_serum
+  Predicted viability: 72.3% ± 23.9%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 4: 190.1mM dmso + 1.41M ethylene_glycol + 66.21M fbs
-  Predicted viability: 71.8% ± 22.4%
+Rank 3: 190.1mM dmso + 1.41M ethylene_glycol + 66.2% fbs
+  Predicted viability: 71.5% ± 22.2%
   DMSO: 1.4%
   Ingredients: 3
 
-Rank 5: 1.03M ethylene_glycol + 36.1mM proline
-  Predicted viability: 69.4% ± 23.0%
+Rank 4: 1.03M ethylene_glycol + 36.1mM proline
+  Predicted viability: 70.9% ± 22.8%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 6: 19.48M fbs + 487.9mM trehalose
-  Predicted viability: 69.2% ± 22.7%
+Rank 5: 19.5% fbs + 487.9mM trehalose
+  Predicted viability: 69.5% ± 22.4%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 7: 36.76M fbs + 1.86M glycerol
-  Predicted viability: 69.1% ± 23.4%
+Rank 6: 36.8% fbs + 1.86M glycerol
+  Predicted viability: 69.2% ± 23.1%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 8: 30.1mM betaine + 1.83M glycerol + 4.65M hsa
-  Predicted viability: 68.3% ± 21.5%
+Rank 7: 30.1mM betaine + 1.83M glycerol + 4.7% hsa
+  Predicted viability: 68.4% ± 21.3%
   DMSO: 0.0%
   Ingredients: 3
 
-Rank 9: 2.27M ethylene_glycol + 985.6mM glycerol + 4.68M hsa + 6.43M hyaluronic_acid
-  Predicted viability: 68.3% ± 25.2%
+Rank 8: 1.3% hsa + 346.5mM sucrose
+  Predicted viability: 68.1% ± 24.0%
   DMSO: 0.0%
-  Ingredients: 4
+  Ingredients: 2
 
-Rank 10: 1.27M hsa + 346.5mM sucrose
-  Predicted viability: 67.8% ± 24.4%
+Rank 9: 629.2mM ethylene_glycol + 429.5mM raffinose
+  Predicted viability: 68.1% ± 24.2%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 10: 7.0mM ectoin + 181.5mM raffinose
+  Predicted viability: 68.0% ± 23.5%
   DMSO: 0.0%
   Ingredients: 2
 

@@ -74,8 +74,8 @@ def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, List[str
     Returns:
         Tuple of (X features, y target, feature_names)
     """
-    # Get ingredient columns (features)
-    ingredient_cols = [c for c in df.columns if c.endswith('_M')]
+    # Get ingredient columns (both molar _M and percentage _pct)
+    ingredient_cols = [c for c in df.columns if c.endswith('_M') or c.endswith('_pct')]
     
     # Filter to only include ingredients with at least 3 non-zero values
     active_ingredients = []
@@ -295,7 +295,7 @@ def analyze_feature_importance(gp: GaussianProcessRegressor, scaler: StandardSca
         importance = baseline_score - permuted_score
         
         importance_scores.append({
-            'feature': name.replace('_M', ''),
+            'feature': name.replace('_M', '').replace('_pct', ''),
             'importance': importance,
         })
     

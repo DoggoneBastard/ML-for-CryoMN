@@ -57,6 +57,19 @@ High EI means: either high predicted viability OR high uncertainty (unexplored r
 | Max DMSO | 5% (general), 0.5% (DMSO-free) |
 | Max ingredients | 10 |
 
+## Output Format
+
+Results include both molar and percentage-based ingredients:
+
+```csv
+rank,expected_improvement,predicted_viability,uncertainty,dmso_M,trehalose_M,fbs_pct,...
+1,0.806,63.5,25.0,0.0,0.3,20.0,...
+```
+
+**Formulation display** correctly shows units:
+- Molar ingredients: `0.50M trehalose`
+- Percentage ingredients: `20.0% FBS`
+
 ## Comparison: Random Sampling vs DE-based BO
 
 | Aspect | `03_optimization` | `05_bo_optimization` |
@@ -71,3 +84,10 @@ High EI means: either high predicted viability OR high uncertainty (unexplored r
 
 - **`03_optimization`**: Quick candidate generation, initial exploration, when speed matters
 - **`05_bo_optimization`**: Serious optimization, when you want the most informative experiments
+
+## Latest Results
+
+| Category | Top EI | Predicted Viability |
+|----------|--------|---------------------|
+| General (≤5% DMSO) | 0.806 | 63.5% ± 25.0% |
+| DMSO-free | 0.806 | 63.5% ± 25.0% |

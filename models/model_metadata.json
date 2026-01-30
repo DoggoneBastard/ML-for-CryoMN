@@ -2,28 +2,28 @@
   "feature_names": [
     "betaine_M",
     "creatine_M",
-    "dextran_M",
+    "dextran_pct",
     "dmso_M",
     "ectoin_M",
     "ethylene_glycol_M",
-    "fbs_M",
+    "fbs_pct",
     "glucose_M",
     "glycerol_M",
-    "hes_M",
-    "hsa_M",
-    "human_serum_M",
-    "hyaluronic_acid_M",
-    "methylcellulose_M",
-    "peg_M",
+    "hes_pct",
+    "hsa_pct",
+    "human_serum_pct",
+    "hyaluronic_acid_pct",
+    "methylcellulose_pct",
+    "peg_3350_pct",
     "proline_M",
     "propylene_glycol_M",
-    "pvp_M",
+    "pvp_pct",
     "raffinose_M",
     "sucrose_M",
     "trehalose_M"
   ],
   "n_features": 21,
-  "trained_at": "2026-01-24T22:33:51.434174",
+  "trained_at": "2026-01-30T12:33:19.875878",
   "config": {
     "kernel_type": "matern",
     "matern_nu": 2.5,
@@ -34,18 +34,18 @@
   },
   "metrics": {
     "cv": {
-      "cv_rmse_mean": 20.434891834320418,
-      "cv_rmse_std": 0.9343258267611256,
-      "cv_r2_mean": 0.26632800216148805,
-      "cv_r2_std": 0.09651274376304848,
+      "cv_rmse_mean": 20.252086053285186,
+      "cv_rmse_std": 1.9917410425962676,
+      "cv_r2_mean": 0.24719428784749606,
+      "cv_r2_std": 0.09582818358666192,
       "n_folds": 5
     },
     "train": {
-      "mse": 216.47649855734144,
-      "rmse": 14.713140336357206,
-      "mae": 10.803052658088092,
-      "r2": 0.6273714997310411,
-      "mean_uncertainty": 19.453292831430094
+      "mse": 211.71013099871683,
+      "rmse": 14.550262231269814,
+      "mae": 10.664708093211502,
+      "r2": 0.618131155659742,
+      "mean_uncertainty": 19.19245034420479
     }
   }
 }

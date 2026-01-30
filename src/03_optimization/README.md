@@ -58,10 +58,16 @@ python src/03_optimization/optimize_formulation.py
 
 ## Output Format
 
+The output CSV includes both molar and percentage-based features:
+
 ```csv
-rank,predicted_viability,uncertainty,dmso_percent,n_ingredients,dmso_M,trehalose_M,...
-1,85.2,12.3,0.0,5,0.0,0.5,...
+rank,predicted_viability,uncertainty,dmso_percent,n_ingredients,dmso_M,trehalose_M,fbs_pct,hsa_pct,...
+1,85.2,12.3,0.0,5,0.0,0.5,20.0,0.0,...
 ```
+
+**Column naming convention:**
+- `{ingredient}_M` - Molar concentration
+- `{ingredient}_pct` - Percentage concentration
 
 ## Programmatic Usage
 
@@ -72,3 +78,10 @@ config = OptimizationConfig(max_dmso_percent=0.0, n_candidates=50)
 optimizer = FormulationOptimizer(gp, scaler, feature_names, config)
 candidates = optimizer.generate_low_dmso_candidates(X, y)
 ```
+
+## Latest Results
+
+| Category | Top Candidate | Predicted Viability |
+|----------|---------------|---------------------|
+| General (≤5% DMSO) | 3-ingredient DMSO-free | 72.3% ± 23.5% |
+| DMSO-free | 2-ingredient formulation | 81.6% ± 20.6% |

@@ -323,14 +323,20 @@ def format_formulation(row: pd.Series, feature_names: List[str]) -> str:
     parts = []
     for name in feature_names:
         if name in row and row[name] > 1e-6:
-            clean_name = name.replace('_M', '')
-            conc = row[name]
-            if conc >= 1.0:
-                parts.append(f"{conc:.2f}M {clean_name}")
-            elif conc >= 0.001:
-                parts.append(f"{conc*1000:.1f}mM {clean_name}")
+            # Handle both _M (molar) and _pct (percentage) suffixes
+            if name.endswith('_pct'):
+                clean_name = name.replace('_pct', '')
+                conc = row[name]
+                parts.append(f"{conc:.1f}% {clean_name}")
             else:
-                parts.append(f"{conc*1e6:.1f}µM {clean_name}")
+                clean_name = name.replace('_M', '')
+                conc = row[name]
+                if conc >= 1.0:
+                    parts.append(f"{conc:.2f}M {clean_name}")
+                elif conc >= 0.001:
+                    parts.append(f"{conc*1000:.1f}mM {clean_name}")
+                else:
+                    parts.append(f"{conc*1e6:.1f}µM {clean_name}")
     return ' + '.join(parts)
 
 

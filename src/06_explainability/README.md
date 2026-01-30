@@ -8,7 +8,7 @@ This module generates comprehensive visualizations to explain how the Gaussian P
 
 ```bash
 cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
-python3 src/06_explainability/explainability.py
+python src/06_explainability/explainability.py
 ```
 
 ## Input
@@ -38,6 +38,8 @@ All visualizations are saved to `results/explainability/`:
 ### 1. Feature Importance Bar Chart
 Shows which ingredients have the strongest influence on cell viability predictions, based on permutation importance from model training.
 
+**Note**: Feature names are cleaned for display (both `_M` and `_pct` suffixes are removed).
+
 ### 2. SHAP Analysis
 Uses [SHAP (SHapley Additive exPlanations)](https://shap.readthedocs.io/) to explain individual predictions:
 - **Summary plot**: Shows direction and magnitude of feature effects
@@ -47,7 +49,7 @@ Uses [SHAP (SHapley Additive exPlanations)](https://shap.readthedocs.io/) to exp
 
 ### 3. Partial Dependence Plots (PDPs)
 Shows the marginal effect of each ingredient on predicted viability:
-- X-axis: Ingredient concentration (M)
+- X-axis: Ingredient concentration (M or %)
 - Y-axis: Predicted viability (%)
 - Blue line: Mean prediction
 - Shaded area: 95% confidence interval from GP uncertainty
@@ -94,7 +96,7 @@ CryoMN Model Explainability Analysis
 
 📊 Loading model and data...
   Model loaded with 21 features
-  Data loaded with 127 formulations
+  Data loaded with 191 formulations
 
 📈 Generating visualizations...
 
@@ -118,6 +120,7 @@ CryoMN Model Explainability Analysis
 - **DMSO**: Highest importance (0.29) - key cryoprotectant but toxic at high concentrations
 - **HES, Trehalose, Sucrose**: Important sugars for cell membrane protection
 - **Glycerol**: Classic CPA with high importance
+- **FBS**: Percentage-based serum with protective effects
 
 ### Reading the PDPs
 - Upward slope: Ingredient increases viability
@@ -128,3 +131,12 @@ CryoMN Model Explainability Analysis
 - High EI regions: Most informative next experiments
 - High uncertainty + moderate mean: Exploration opportunities
 - High mean + low uncertainty: Exploitation (known good regions)
+
+## Feature Name Handling
+
+The module automatically cleans feature names for display:
+- `dmso_M` → `Dmso`
+- `fbs_pct` → `Fbs`
+- `hyaluronic_acid_pct` → `Hyaluronic Acid`
+
+Both `_M` (molar) and `_pct` (percentage) suffixes are stripped for readability.

@@ -54,15 +54,17 @@ python src/06_explainability/explainability.py
 
 | Category | Best Candidate | Predicted Viability |
 |----------|----------------|---------------------|
-| General (≤5% DMSO) | 628mM DMSO + 6.5M hyaluronic acid | 75.1% ± 18.5% |
-| DMSO-free | 1.8M ethylene glycol + 52% FBS + 632mM HES | 72.5% ± 23.9% |
+| General (≤5% DMSO) | 1.83M EG + 52% FBS + 0.6% HES | 72.4% ± 23.6% |
+| DMSO-free | 2.07M ethylene glycol | 81.6% ± 20.8% |
+
+> **Key Finding**: The model predicts high ethylene glycol concentrations (~2M) are highly effective without DMSO.
 
 ### DE-based BO (`05_bo_optimization`)
 
 | Category | Best Candidate | Expected Improvement |
 |----------|----------------|----------------------|
-| General (≤5% DMSO) | 10-ingredient formulation | EI = 0.845 |
-| DMSO-free | 10-ingredient formulation | EI = 0.845 |
+| General (≤5% DMSO) | 10-ingredient formulation | EI = 0.840 |
+| DMSO-free | 10-ingredient formulation | EI = 0.840 |
 
 > **Note**: DE-based BO prioritizes *informative* experiments (high uncertainty) over highest predicted mean.
 
@@ -76,7 +78,7 @@ Understanding which ingredients drive cell viability predictions is crucial for 
 
 ### Feature Importance
 
-DMSO has the strongest influence on predictions, followed by HES, trehalose, and sucrose:
+DMSO has the strongest influence on predictions, followed by trehalose, HES, and sucrose:
 
 ![Feature Importance](results/explainability/feature_importance.png)
 
@@ -101,7 +103,7 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 ```
 ├── data/
 │   ├── raw/                    # Original literature data
-│   ├── processed/              # Parsed formulations (~200 rows)
+│   ├── processed/              # Parsed formulations (~198 rows)
 │   └── validation/             # Wet lab results template
 ├── models/                     # Trained GP model + scaler
 ├── results/                    # Optimized candidate formulations
@@ -127,9 +129,11 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 
 ## Key Features
 
-- **21 ingredients** tracked (DMSO, trehalose, glycerol, FBS, etc.)
+- **34 ingredients** tracked (DMSO, trehalose, glycerol, FBS, PEG by MW, etc.)
+- **PEG molecular weight handling**: Individual tracking of PEG 400, 600, 1K, 3350, 5K, 10K, 20K, etc.
+- **Dual unit handling**: Molar (`_M`) for CPAs, Percentage (`_pct`) for sera/polymers
 - **Synonym merging** (e.g., FBS = FCS = fetal bovine serum)
-- **Unit normalization** (all concentrations converted to molar)
+- **Unit normalization** (concentrations converted to molar or kept as percentage)
 - **Uncertainty quantification** (GP provides confidence intervals)
 - **Iterative refinement** (model improves with each wet lab validation)
 - **Explainable AI** (SHAP and partial dependence plots to interpret Black Box GP)

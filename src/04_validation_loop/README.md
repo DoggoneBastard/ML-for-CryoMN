@@ -65,6 +65,18 @@ python src/04_validation_loop/update_model_weighted_simple.py
 python src/04_validation_loop/update_model_weighted_prior.py
 ```
 
+## Validation CSV Format
+
+The template uses **clean ingredient names** (without `_M` or `_pct` suffixes):
+
+```csv
+experiment_id,experiment_date,viability_measured,notes,dmso,trehalose,glycerol,fbs,hsa,...
+EXP001,2026-01-25,85.5,"Test batch 1",0.0,0.3,0.5,20.0,0.0,...
+EXP002,2026-01-26,72.3,"Higher trehalose",0.0,0.5,0.5,0.0,4.0,...
+```
+
+**Note**: The script automatically maps clean names to the appropriate `_M` or `_pct` columns based on the feature names in the trained model.
+
 ## Weighting Approaches
 
 ### Option A: Sample Duplication (`update_model_weighted_simple.py`)
@@ -97,14 +109,6 @@ ALPHA_WETLAB = 0.1       # Lower noise = more trusted
 - Works with very few samples
 
 **Output:** Creates a `CompositeGP` model with both components.
-
-## Validation CSV Format
-
-```csv
-experiment_id,experiment_date,viability_measured,notes,dmso,trehalose,glycerol,...
-EXP001,2026-01-25,85.5,"Test batch 1",0.0,0.3,0.5,...
-EXP002,2026-01-26,72.3,"Repeat with higher trehalose",0.0,0.5,0.5,...
-```
 
 ## Output
 
