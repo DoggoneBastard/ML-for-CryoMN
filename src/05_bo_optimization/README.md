@@ -55,6 +55,7 @@ High EI means: either high predicted viability OR high uncertainty (unexplored r
 | Constraint | Value |
 |------------|-------|
 | Max DMSO | 5% (general), 0.5% (DMSO-free) |
+| Max viscous polymers | 2.0% (Hyaluronic Acid, Methylcellulose) |
 | Max ingredients | 10 |
 
 ## Output Format
@@ -89,5 +90,5 @@ rank,expected_improvement,predicted_viability,uncertainty,dmso_M,trehalose_M,fbs
 
 | Category | Top EI | Predicted Viability |
 |----------|--------|---------------------|
-| General (≤5% DMSO) | 0.806 | 63.5% ± 25.0% |
-| DMSO-free | 0.806 | 63.5% ± 25.0% |
+| General (≤5% DMSO) | 0.842 | 63.9% ± 25.1% |
+| DMSO-free | 0.840 | 63.9% ± 25.1% |

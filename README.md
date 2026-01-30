@@ -63,7 +63,7 @@ python src/06_explainability/explainability.py
 
 | Category | Best Candidate | Expected Improvement |
 |----------|----------------|----------------------|
-| General (≤5% DMSO) | 10-ingredient formulation | EI = 0.840 |
+| General (≤5% DMSO) | 10-ingredient formulation | EI = 0.842 |
 | DMSO-free | 10-ingredient formulation | EI = 0.840 |
 
 > **Note**: DE-based BO prioritizes *informative* experiments (high uncertainty) over highest predicted mean.
@@ -76,23 +76,23 @@ See `results/` for full candidate lists.
 
 Understanding which ingredients drive cell viability predictions is crucial for guiding wet lab experiments. The explainability module generates comprehensive visualizations:
 
-### Feature Importance
-
-DMSO has the strongest influence on predictions, followed by trehalose, HES, and sucrose:
-
-![Feature Importance](results/explainability/feature_importance.png)
-
-### SHAP Analysis
+### SHAP Importance
 
 SHAP values reveal how each ingredient impacts individual predictions. High DMSO concentrations (pink dots) can have both positive and negative effects:
 
 ![SHAP Summary](results/explainability/shap_summary.png)
 
-### Partial Dependence Plots
+### Acquisition Landscape
 
-See how predicted viability changes across concentration ranges for each ingredient:
+The Expected Improvement landscape guides the optimizer towards high-value regions:
 
-![Partial Dependence Plots](results/explainability/partial_dependence_plots.png)
+![Acquisition Landscape](results/explainability/acquisition_landscape.png)
+
+### Interaction Contours
+
+Visualizing how pairs of top ingredients interact to affect viability:
+
+![Interaction Contours](results/explainability/interaction_contours.png)
 
 For detailed interpretation and additional visualizations, see [`src/06_explainability/README.md`](src/06_explainability/README.md).
 
