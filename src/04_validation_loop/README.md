@@ -42,7 +42,7 @@ This module integrates wet lab validation results to iteratively refine the GP m
 ### First Time Setup
 
 ```bash
-cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
+cd "/path/to/project"
 python src/04_validation_loop/update_model.py
 ```
 

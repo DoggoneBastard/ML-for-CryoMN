@@ -7,7 +7,7 @@ This module parses cryoprotective solution formulation data from literature-deri
 ## Usage
 
 ```bash
-cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
+cd "/path/to/project"
 python src/01_data_parsing/parse_formulations.py
 ```
 

@@ -7,7 +7,7 @@ This module trains a Gaussian Process (GP) regression model to predict cell viab
 ## Usage
 
 ```bash
-cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
+cd "/path/to/project"
 python src/02_model_training/train_gp_model.py
 ```
 

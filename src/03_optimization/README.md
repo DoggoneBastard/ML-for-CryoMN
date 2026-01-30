@@ -9,7 +9,7 @@ This module generates candidate cryoprotective formulations using **random sampl
 ## Usage
 
 ```bash
-cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
+cd "/path/to/project"
 python src/03_optimization/optimize_formulation.py
 ```
 

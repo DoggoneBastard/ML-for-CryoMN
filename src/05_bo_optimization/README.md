@@ -7,7 +7,7 @@ This module performs **proper Bayesian optimization** using Differential Evoluti
 ## Usage
 
 ```bash
-cd "/Users/doggonebastard/Antigravity/ML for CryoMN"
+cd "/path/to/project"
 python src/05_bo_optimization/bo_optimizer.py
 ```
 
