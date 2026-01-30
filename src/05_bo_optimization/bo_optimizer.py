@@ -420,7 +420,7 @@ def main():
     general_candidates = optimizer.optimize(X, y, n_candidates=20)
     
     print("\n2. DMSO-free optimization...")
-    dmso_free_candidates = optimizer.generate_dmso_free_candidates(X, y, n_candidates=15)
+    dmso_free_candidates = optimizer.generate_dmso_free_candidates(X, y, n_candidates=20)
     
     # Export results
     print("\n" + "-" * 40)
@@ -441,17 +441,17 @@ def main():
     
     # Print top candidates
     print("\n" + "=" * 80)
-    print("Top 5 General Candidates (by Expected Improvement)")
+    print("Top 10 General Candidates (by Expected Improvement)")
     print("=" * 80)
-    for _, row in general_candidates.head(5).iterrows():
+    for _, row in general_candidates.head(10).iterrows():
         print(f"\nRank {int(row['rank'])}: EI = {row['expected_improvement']:.4f}")
         print(f"  Predicted: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
     
     print("\n" + "=" * 80)
-    print("Top 5 DMSO-Free Candidates")
+    print("Top 10 DMSO-Free Candidates")
     print("=" * 80)
-    for _, row in dmso_free_candidates.head(5).iterrows():
+    for _, row in dmso_free_candidates.head(10).iterrows():
         print(f"\nRank {int(row['rank'])}: EI = {row['expected_improvement']:.4f}")
         print(f"  Predicted: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
