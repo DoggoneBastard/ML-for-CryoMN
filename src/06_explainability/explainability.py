@@ -70,14 +70,25 @@ class ExplainabilityConfig:
     
     # PDP settings
     n_pdp_points = 50
-    n_top_features_pdp = 8
+    pdp_specific_features = [
+        'ethylene_glycol_M', 'fbs_pct', 'hsa_pct', 'glycerol_M',
+        'human_serum_pct', 'hes_pct', 'dmso_M', 'trehalose_M'
+    ]
     
     # Contour settings
     n_contour_points = 30
     n_top_pairs = 3
+    interaction_specific_pairs = [
+        ('ethylene_glycol_M', 'fbs_pct'), 
+        ('ethylene_glycol_M', 'hsa_pct'), 
+        ('glycerol_M', 'hsa_pct')
+    ]
     
     # SHAP settings
     n_shap_samples = 100  # Background samples for SHAP
+    
+    # Acquisition settings
+    acquisition_specific_pair = ('dmso_M', 'ethylene_glycol_M')
     
     # Color settings
     cmap_viability = 'RdYlGn'
@@ -126,6 +137,15 @@ def load_model_and_data(project_root: str) -> Tuple[GaussianProcessRegressor,
 def clean_feature_name(name: str) -> str:
     """Clean feature name for display."""
     return name.replace('_M', '').replace('_pct', '').replace('_', ' ').title()
+
+
+def get_unit(feature: str) -> str:
+    """Get the appropriate unit for a feature."""
+    if '_pct' in feature:
+        return '%'
+    elif '_M' in feature:
+        return 'M'
+    return ''
 
 
 # =============================================================================
@@ -277,8 +297,11 @@ def plot_partial_dependence(gp: GaussianProcessRegressor, scaler: StandardScaler
     """
     config = config or ExplainabilityConfig()
     
-    # Get top features by importance
-    top_features = importance_df.nlargest(config.n_top_features_pdp, 'importance')['feature'].tolist()
+    # Get top features by importance or use specific features
+    if hasattr(config, 'pdp_specific_features') and config.pdp_specific_features:
+        top_features = config.pdp_specific_features
+    else:
+        top_features = importance_df.nlargest(config.n_top_features_pdp, 'importance')['feature'].tolist()
     
     # Get feature indices
     feature_indices = {name: i for i, name in enumerate(feature_names)}
@@ -328,7 +351,7 @@ def plot_partial_dependence(gp: GaussianProcessRegressor, scaler: StandardScaler
                         pdp_means + 1.96 * pdp_stds,
                         alpha=0.3, color='blue', label='95% CI')
         
-        ax.set_xlabel(f'{clean_feature_name(feature)} (M)', fontsize=10)
+        ax.set_xlabel(f'{clean_feature_name(feature)} ({get_unit(feature)})', fontsize=10)
         ax.set_ylabel('Predicted Viability (%)', fontsize=10)
         ax.set_title(f'PDP: {clean_feature_name(feature)}', fontsize=11, fontweight='bold')
         ax.legend(fontsize=8)
@@ -365,19 +388,20 @@ def plot_interaction_contours(gp: GaussianProcessRegressor, scaler: StandardScal
     # Get top features
     top_features = importance_df.nlargest(4, 'importance')['feature'].tolist()
     
-    # Get feature indices (handle _M suffix)
-    feature_indices = {}
-    for name in feature_names:
-        clean = name.replace('_M', '').replace('_pct', '')
-        feature_indices[clean] = feature_names.index(name)
+    # Get feature indices (use full feature names with suffixes)
+    feature_indices = {name: i for i, name in enumerate(feature_names)}
     
-    # Generate pairs
-    pairs = []
-    for i in range(len(top_features)):
-        for j in range(i + 1, len(top_features)):
-            pairs.append((top_features[i], top_features[j]))
-    
-    pairs = pairs[:config.n_top_pairs]
+    # Generate pairs or use specific pairs
+    if hasattr(config, 'interaction_specific_pairs') and config.interaction_specific_pairs:
+        pairs = config.interaction_specific_pairs
+    else:
+        # Generate pairs
+        pairs = []
+        for i in range(len(top_features)):
+            for j in range(i + 1, len(top_features)):
+                pairs.append((top_features[i], top_features[j]))
+        
+        pairs = pairs[:config.n_top_pairs]
     
     # Create figure
     fig, axes = plt.subplots(1, len(pairs), figsize=(6 * len(pairs), 5))
@@ -417,8 +441,8 @@ def plot_interaction_contours(gp: GaussianProcessRegressor, scaler: StandardScal
         # Add contour lines
         ax.contour(X1, X2, Z, levels=10, colors='white', alpha=0.3, linewidths=0.5)
         
-        ax.set_xlabel(f'{clean_feature_name(feat1)} (M)', fontsize=10)
-        ax.set_ylabel(f'{clean_feature_name(feat2)} (M)', fontsize=10)
+        ax.set_xlabel(f'{clean_feature_name(feat1)} ({get_unit(feat1)})', fontsize=10)
+        ax.set_ylabel(f'{clean_feature_name(feat2)} ({get_unit(feat2)})', fontsize=10)
         ax.set_title(f'{clean_feature_name(feat1)} × {clean_feature_name(feat2)}', 
                      fontsize=11, fontweight='bold')
     
@@ -456,14 +480,15 @@ def plot_acquisition_landscape(gp: GaussianProcessRegressor, scaler: StandardSca
     """
     config = config or ExplainabilityConfig()
     
-    # Get top 2 features for 2D visualization
-    top_features = importance_df.nlargest(2, 'importance')['feature'].tolist()
+    # Get features for 2D visualization
+    if hasattr(config, 'acquisition_specific_pair') and config.acquisition_specific_pair:
+        top_features = list(config.acquisition_specific_pair)
+    else:
+        # Get top 2 features
+        top_features = importance_df.nlargest(2, 'importance')['feature'].tolist()
     
-    # Get feature indices
-    feature_indices = {}
-    for name in feature_names:
-        clean = name.replace('_M', '').replace('_pct', '')
-        feature_indices[clean] = feature_names.index(name)
+    # Get feature indices (use full feature names with suffixes)
+    feature_indices = {name: i for i, name in enumerate(feature_names)}
     
     feat1, feat2 = top_features[0], top_features[1]
     idx1 = feature_indices.get(feat1)
@@ -472,9 +497,9 @@ def plot_acquisition_landscape(gp: GaussianProcessRegressor, scaler: StandardSca
     X_mean = X.mean(axis=0)
     y_best = y.max()
     
-    # Create grid
+    # Create grid (use fixed range 0-7M for DMSO x-axis to exclude outliers)
     n_points = config.n_contour_points
-    x1_range = np.linspace(X[:, idx1].min(), X[:, idx1].max(), n_points)
+    x1_range = np.linspace(0, 7, n_points)  # Fixed range for DMSO
     x2_range = np.linspace(X[:, idx2].min(), X[:, idx2].max(), n_points)
     X1, X2 = np.meshgrid(x1_range, x2_range)
     
@@ -500,22 +525,22 @@ def plot_acquisition_landscape(gp: GaussianProcessRegressor, scaler: StandardSca
     # Plot 1: GP Mean
     contour1 = axes[0].contourf(X1, X2, Z_mean, levels=20, cmap=config.cmap_viability)
     plt.colorbar(contour1, ax=axes[0], label='Predicted Viability (%)')
-    axes[0].set_xlabel(f'{clean_feature_name(feat1)} (M)')
-    axes[0].set_ylabel(f'{clean_feature_name(feat2)} (M)')
+    axes[0].set_xlabel(f'{clean_feature_name(feat1)} ({get_unit(feat1)})')
+    axes[0].set_ylabel(f'{clean_feature_name(feat2)} ({get_unit(feat2)})')
     axes[0].set_title('GP Mean Prediction', fontweight='bold')
     
     # Plot 2: GP Uncertainty
     contour2 = axes[1].contourf(X1, X2, Z_std, levels=20, cmap=config.cmap_uncertainty)
     plt.colorbar(contour2, ax=axes[1], label='Uncertainty (std)')
-    axes[1].set_xlabel(f'{clean_feature_name(feat1)} (M)')
-    axes[1].set_ylabel(f'{clean_feature_name(feat2)} (M)')
+    axes[1].set_xlabel(f'{clean_feature_name(feat1)} ({get_unit(feat1)})')
+    axes[1].set_ylabel(f'{clean_feature_name(feat2)} ({get_unit(feat2)})')
     axes[1].set_title('GP Uncertainty', fontweight='bold')
     
     # Plot 3: Expected Improvement
     contour3 = axes[2].contourf(X1, X2, Z_ei, levels=20, cmap=config.cmap_ei)
     plt.colorbar(contour3, ax=axes[2], label='Expected Improvement')
-    axes[2].set_xlabel(f'{clean_feature_name(feat1)} (M)')
-    axes[2].set_ylabel(f'{clean_feature_name(feat2)} (M)')
+    axes[2].set_xlabel(f'{clean_feature_name(feat1)} ({get_unit(feat1)})')
+    axes[2].set_ylabel(f'{clean_feature_name(feat2)} ({get_unit(feat2)})')
     axes[2].set_title('Acquisition Function (EI)', fontweight='bold')
     
     # Mark best observed point
