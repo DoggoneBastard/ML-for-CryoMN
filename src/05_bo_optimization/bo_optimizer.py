@@ -155,6 +155,8 @@ class BayesianOptimizer:
                 bounds.append((0.0, 0.5))
             elif any(x in name_lower for x in ['fbs', 'human_serum']):
                 bounds.append((0.0, 90.0))
+            elif any(x in name_lower for x in ['hyaluronic_acid', 'methylcellulose']):
+                bounds.append((0.0, 2.0))
             else:
                 bounds.append((0.0, 10.0))
         return bounds
