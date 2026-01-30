@@ -533,7 +533,7 @@ def main():
     general_candidates = optimizer.optimize(X, y, n_candidates=20)
     
     print("\n2. DMSO-free optimization...")
-    dmso_free_candidates = optimizer.generate_low_dmso_candidates(X, y, n_candidates=15)
+    dmso_free_candidates = optimizer.generate_low_dmso_candidates(X, y, n_candidates=20)
     
     # Export results
     print("\n" + "-" * 40)

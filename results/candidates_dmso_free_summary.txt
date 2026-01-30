@@ -1,6 +1,6 @@
 ================================================================================
 CryoMN Optimized Formulation Candidates
-Generated: 2026-01-30 14:12
+Generated: 2026-01-30 14:13
 ================================================================================
 
 Rank 1: 33.0mM dmso + 2.07M ethylene_glycol
@@ -23,33 +23,33 @@ Rank 4: 4.7% hsa + 3.7% peg_3350
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 5: 1.86M glycerol + 1.9% hsa
+Rank 5: 975.7mM ethylene_glycol + 8.5% hsa + 67.6mM proline
+  Predicted viability: 69.4% ± 23.5%
+  DMSO: 0.0%
+  Ingredients: 3
+
+Rank 6: 1.86M glycerol + 1.9% hsa
   Predicted viability: 69.0% ± 20.7%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 6: 143.1mM ectoin + 1.28M ethylene_glycol
+Rank 7: 143.1mM ectoin + 1.28M ethylene_glycol
   Predicted viability: 69.0% ± 24.6%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 7: 12.2mM dmso + 1.91M glycerol + 1.6% pvp
+Rank 8: 12.2mM dmso + 1.91M glycerol + 1.6% pvp
   Predicted viability: 68.8% ± 21.2%
   DMSO: 0.1%
   Ingredients: 3
 
-Rank 8: 88.5mM betaine + 75.6% human_serum
+Rank 9: 88.5mM betaine + 75.6% human_serum
   Predicted viability: 68.1% ± 24.6%
   DMSO: 0.0%
   Ingredients: 2
 
-Rank 9: 161.2mM ectoin + 1.05M ethylene_glycol
+Rank 10: 161.2mM ectoin + 1.05M ethylene_glycol
   Predicted viability: 67.6% ± 24.7%
   DMSO: 0.0%
   Ingredients: 2
-
-Rank 10: 34.7% fbs + 2.35M glycerol + 6.0% hsa
-  Predicted viability: 67.4% ± 23.7%
-  DMSO: 0.0%
-  Ingredients: 3
 
