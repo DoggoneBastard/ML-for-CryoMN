@@ -1,6 +1,6 @@
 ================================================================================
 CryoMN Bayesian Optimization Candidates (DE-based)
-Generated: 2026-01-30 14:32
+Generated: 2026-02-11 09:22
 ================================================================================
 
 Rank 1: 2.47M ethylene_glycol + 13.4% fbs + 621.8mM glycerol + 1.6% hes + 8.9% hsa + 3.0% human_serum + 2.0% peg_3350 + 513.9mM propylene_glycol + 5.1% pvp + 604.7mM trehalose
