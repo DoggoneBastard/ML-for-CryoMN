@@ -372,7 +372,7 @@ class FormulationOptimizer:
     
     def generate_low_dmso_candidates(self, X_observed: np.ndarray, 
                                       y_observed: np.ndarray,
-                                      n_candidates: int = 10) -> pd.DataFrame:
+                                      n_candidates: int = 20) -> pd.DataFrame:
         """
         Generate candidates with zero or minimal DMSO.
         
@@ -447,7 +447,7 @@ def export_candidates(candidates_df: pd.DataFrame, feature_names: List[str],
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
         f.write("=" * 80 + "\n\n")
         
-        for _, row in candidates_df.head(10).iterrows():
+        for _, row in candidates_df.iterrows():
             f.write(f"Rank {int(row['rank'])}: {format_formulation(row, feature_names)}\n")
             f.write(f"  Predicted viability: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%\n")
             f.write(f"  DMSO: {row['dmso_percent']:.1f}%\n")
