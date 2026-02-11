@@ -554,16 +554,16 @@ def main():
     
     # Print top candidates
     print("\n" + "=" * 80)
-    print("Top 10 General Candidates")
+    print("Top 20 General Candidates")
     print("=" * 80)
-    for _, row in general_candidates.head(10).iterrows():
+    for _, row in general_candidates.head(20).iterrows():
         print(f"\nRank {int(row['rank'])}: Viability = {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
     
     print("\n" + "=" * 80)
-    print("Top 10 DMSO-Free Candidates")
+    print("Top 20 DMSO-Free Candidates")
     print("=" * 80)
-    for _, row in dmso_free_candidates.head(10).iterrows():
+    for _, row in dmso_free_candidates.head(20).iterrows():
         print(f"\nRank {int(row['rank'])}: Viability = {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
     
