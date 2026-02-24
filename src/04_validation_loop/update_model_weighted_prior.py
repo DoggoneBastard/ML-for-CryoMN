@@ -60,7 +60,7 @@ def create_validation_template(feature_names: List[str], output_path: str):
         output_path: Path to save template
     """
     columns = ['experiment_id', 'experiment_date', 'viability_measured', 'notes']
-    columns.extend([name.replace('_M', '').replace('_pct', '') for name in feature_names])
+    columns.extend(feature_names)
     
     template_df = pd.DataFrame(columns=columns)
     
@@ -94,9 +94,8 @@ def load_validation_results(validation_path: str, feature_names: List[str]) -> T
         
         x = np.zeros(len(feature_names))
         for i, name in enumerate(feature_names):
-            col_name = name.replace('_M', '').replace('_pct', '')
-            if col_name in row and pd.notna(row[col_name]):
-                x[i] = float(row[col_name])
+            if name in row and pd.notna(row[name]):
+                x[i] = float(row[name])
         
         X_data.append(x)
         y_data.append(float(row['viability_measured']))

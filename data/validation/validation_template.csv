@@ -1,2 +1,2 @@
-experiment_id,experiment_date,viability_measured,notes,betaine,creatine,dextran,dmso,ectoin,ethylene_glycol,fbs,ficoll,glucose,glycerol,hes,hsa,human_serum,hyaluronic_acid,methylcellulose,peg,proline,propylene_glycol,pvp,raffinose,sucrose,trehalose
-EXP001,2026-01-25,85.5,Example entry,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+experiment_id,experiment_date,viability_measured,notes,acetamide_M,betaine_M,cooh_pll_pct,creatine_M,dextran_pct,dmso_M,ectoin_M,ethylene_glycol_M,fbs_pct,ficoll_pct,glucose_M,glycerol_M,hes_pct,hsa_pct,human_serum_pct,hyaluronic_acid_pct,methylcellulose_pct,peg_10k_pct,peg_1500_pct,peg_1k_pct,peg_20k_pct,peg_3350_pct,peg_400_pct,peg_5k_pct,peg_600_pct,pentaisomaltose_pct,proline_M,propylene_glycol_M,pvp_pct,raffinose_M,sericin_pct,sucrose_M,taurine_M,trehalose_M
+EXP001,2026-01-25,85.5,Example entry,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
