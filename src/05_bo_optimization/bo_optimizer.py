@@ -12,6 +12,7 @@ Date: 2026-01-26
 import pandas as pd
 import numpy as np
 import os
+import sys
 import json
 import pickle
 from typing import Tuple, Dict, List, Optional
@@ -22,6 +23,13 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.preprocessing import StandardScaler
 from scipy.optimize import differential_evolution
 from scipy.stats import norm
+
+# Add validation loop to path for CompositeGP deserialization
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_validation_dir = os.path.join(os.path.dirname(_script_dir), '04_validation_loop')
+if _validation_dir not in sys.path:
+    sys.path.insert(0, _validation_dir)
+from update_model_weighted_prior import CompositeGP  # noqa: E402
 
 
 # =============================================================================
@@ -45,24 +53,29 @@ class BOConfig:
 # ACQUISITION FUNCTIONS
 # =============================================================================
 
-def expected_improvement(x: np.ndarray, gp: GaussianProcessRegressor, 
+def expected_improvement(x: np.ndarray, gp, 
                          scaler: StandardScaler, y_best: float, 
-                         xi: float = 0.01) -> float:
+                         xi: float = 0.01, is_composite: bool = False) -> float:
     """
     Calculate Expected Improvement for a single point.
     
     Args:
         x: Formulation vector (unscaled)
-        gp: Trained Gaussian Process
-        scaler: Feature scaler
+        gp: Trained Gaussian Process (or CompositeGP)
+        scaler: Feature scaler (unused if is_composite)
         y_best: Best observed viability
         xi: Exploration-exploitation trade-off
+        is_composite: If True, skip external scaling (model handles it)
         
     Returns:
         Negative EI (for minimization)
     """
-    x_scaled = scaler.transform(x.reshape(1, -1))
-    mean, std = gp.predict(x_scaled, return_std=True)
+    x_reshaped = x.reshape(1, -1)
+    if is_composite:
+        mean, std = gp.predict(x_reshaped, return_std=True)
+    else:
+        x_scaled = scaler.transform(x_reshaped)
+        mean, std = gp.predict(x_scaled, return_std=True)
     mean, std = mean[0], std[0]
     
     # Handle zero variance
@@ -109,21 +122,24 @@ class BayesianOptimizer:
     providing proper exploration-exploitation balance.
     """
     
-    def __init__(self, gp: GaussianProcessRegressor, scaler: StandardScaler,
-                 feature_names: List[str], config: BOConfig = None):
+    def __init__(self, gp, scaler: StandardScaler,
+                 feature_names: List[str], config: BOConfig = None,
+                 is_composite: bool = False):
         """
         Initialize optimizer.
         
         Args:
-            gp: Trained Gaussian Process model
-            scaler: Feature scaler
+            gp: Trained Gaussian Process model (or CompositeGP)
+            scaler: Feature scaler (unused if is_composite)
             feature_names: List of feature names
             config: Optimization configuration
+            is_composite: If True, model handles scaling internally
         """
         self.gp = gp
         self.scaler = scaler
         self.feature_names = feature_names
         self.config = config or BOConfig()
+        self.is_composite = is_composite
         
         # Find DMSO index
         self.dmso_index = -1
@@ -182,7 +198,7 @@ class BayesianOptimizer:
         x_sparse = self._sparsify(x)
         
         # Calculate EI on sparsified formulation
-        neg_ei = expected_improvement(x_sparse, self.gp, self.scaler, y_best, self.config.xi)
+        neg_ei = expected_improvement(x_sparse, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
         
         # Soft penalty for DMSO (in case it slightly exceeds)
         penalty = 0.0
@@ -226,8 +242,16 @@ class BayesianOptimizer:
         if n_candidates is None:
             n_candidates = self.config.n_candidates
         
-        y_best = np.max(y_observed)
-        print(f"Best observed viability: {y_best:.1f}%")
+        if self.is_composite:
+            # When using composite model, compute y_best from model predictions
+            # Raw y_observed may contain literature values (up to 100%) that the
+            # composite model would predict much lower, making EI near-zero everywhere
+            y_pred = self.gp.predict(X_observed)
+            y_best = np.max(y_pred)
+            print(f"Best model-predicted viability: {y_best:.1f}% (raw observed max: {np.max(y_observed):.1f}%)")
+        else:
+            y_best = np.max(y_observed)
+            print(f"Best observed viability: {y_best:.1f}%")
         print(f"Running DE optimization for {n_candidates} candidates...")
         
         candidates = []
@@ -250,8 +274,12 @@ class BayesianOptimizer:
                     x_opt[idx] = 0.0
             
             # Get final prediction
-            x_scaled = self.scaler.transform(x_opt.reshape(1, -1))
-            pred_mean, pred_std = self.gp.predict(x_scaled, return_std=True)
+            x_reshaped = x_opt.reshape(1, -1)
+            if self.is_composite:
+                pred_mean, pred_std = self.gp.predict(x_reshaped, return_std=True)
+            else:
+                x_scaled = self.scaler.transform(x_reshaped)
+                pred_mean, pred_std = self.gp.predict(x_scaled, return_std=True)
             
             # Calculate DMSO percentage
             dmso_molar = x_opt[self.dmso_index] if self.dmso_index >= 0 else 0
@@ -383,12 +411,24 @@ def main():
     print("CryoMN Bayesian Optimization with Differential Evolution")
     print("=" * 80)
     
-    # Load model
+    # Load model — prefer composite model if available
     print("\nLoading trained model...")
-    with open(os.path.join(model_dir, 'gp_model.pkl'), 'rb') as f:
-        gp = pickle.load(f)
-    with open(os.path.join(model_dir, 'scaler.pkl'), 'rb') as f:
-        scaler = pickle.load(f)
+    composite_path = os.path.join(model_dir, 'composite_model.pkl')
+    is_composite = False
+    
+    if os.path.exists(composite_path):
+        with open(composite_path, 'rb') as f:
+            gp = pickle.load(f)
+        is_composite = True
+        scaler = None  # Composite model handles scaling internally
+        print(">>> Using COMPOSITE model (literature prior + wet lab correction)")
+    else:
+        with open(os.path.join(model_dir, 'gp_model.pkl'), 'rb') as f:
+            gp = pickle.load(f)
+        with open(os.path.join(model_dir, 'scaler.pkl'), 'rb') as f:
+            scaler = pickle.load(f)
+        print(">>> Using STANDARD GP model (literature-only)")
+    
     with open(os.path.join(model_dir, 'model_metadata.json'), 'r') as f:
         metadata = json.load(f)
     
@@ -411,7 +451,7 @@ def main():
         n_candidates=20,
     )
     
-    optimizer = BayesianOptimizer(gp, scaler, feature_names, config)
+    optimizer = BayesianOptimizer(gp, scaler, feature_names, config, is_composite=is_composite)
     
     # Generate candidates
     print("\n" + "-" * 40)
