@@ -43,12 +43,14 @@ class BOConfig:
     max_dmso_percent: float = 5.0  # Set to 0.5 for DMSO-free
     min_viability: float = 70.0
     n_candidates: int = 20
+    acquisition: str = 'ucb'  # 'ei' or 'ucb'
     xi: float = 0.01  # EI exploration parameter
+    kappa: float = 0.5  # UCB exploration parameter
     de_maxiter: int = 100  # DE iterations per candidate
     de_popsize: int = 15  # DE population size
     random_seed: int = 42
     diversity_penalty: float = 5.0  # Strength of local penalization for batch diversity
-    diversity_radius: float = 0.3  # Fraction of feature range for penalty radius
+    diversity_radius: float = 0.05  # Fraction of feature range (reduced to stay on the predictive peak)
 
 
 # =============================================================================
@@ -87,8 +89,34 @@ def expected_improvement(x: np.ndarray, gp,
     z = (mean - y_best - xi) / std
     ei = (mean - y_best - xi) * norm.cdf(z) + std * norm.pdf(z)
     
-    # Return negative for minimization (DE minimizes)
-    return -ei
+    return ei
+
+
+def upper_confidence_bound(x: np.ndarray, gp,
+                           scaler: StandardScaler, kappa: float = 1.96,
+                           is_composite: bool = False) -> float:
+    """
+    Calculate Upper Confidence Bound for a single point.
+    
+    Args:
+        x: Formulation vector (unscaled)
+        gp: Trained Gaussian Process (or CompositeGP)
+        scaler: Feature scaler (unused if is_composite)
+        kappa: Exploration weight
+        is_composite: If True, skip external scaling (model handles it)
+        
+    Returns:
+        UCB value
+    """
+    x_reshaped = x.reshape(1, -1)
+    if is_composite:
+        mean, std = gp.predict(x_reshaped, return_std=True)
+    else:
+        x_scaled = scaler.transform(x_reshaped)
+        mean, std = gp.predict(x_scaled, return_std=True)
+    mean, std = mean[0], std[0]
+    
+    return mean + kappa * std
 
 
 # =============================================================================
@@ -225,13 +253,19 @@ class BayesianOptimizer:
     def _objective_with_penalty(self, x: np.ndarray, y_best: float,
                                 found_candidates: List[np.ndarray] = None) -> float:
         """
-        Objective function for DE: negative EI + constraint penalties + diversity penalty.
+        Objective function for DE: negative acquisition value + constraint penalties + diversity penalty.
         """
         # Sparsify first to enforce ingredient constraint
         x_sparse = self._sparsify(x)
         
-        # Calculate EI on sparsified formulation
-        neg_ei = expected_improvement(x_sparse, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
+        # Calculate acquisition value on sparsified formulation
+        if self.config.acquisition.lower() == 'ei':
+            acq_val = expected_improvement(x_sparse, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
+        else:
+            acq_val = upper_confidence_bound(x_sparse, self.gp, self.scaler, self.config.kappa, self.is_composite)
+        
+        # We negate the acquisition value because DE minimizes
+        neg_acq = -acq_val
         
         # Soft penalty for DMSO (in case it slightly exceeds)
         penalty = 0.0
@@ -242,7 +276,7 @@ class BayesianOptimizer:
         if found_candidates:
             penalty += self._local_penalizer(x_sparse, found_candidates)
         
-        return neg_ei + penalty
+        return neg_acq + penalty
     
     def _run_de_single(self, y_best: float, seed: int,
                        found_candidates: List[np.ndarray] = None) -> Tuple[np.ndarray, float]:
@@ -255,7 +289,7 @@ class BayesianOptimizer:
             found_candidates: Previously found candidates for diversity penalty
             
         Returns:
-            Tuple of (best formulation, EI value)
+            Tuple of (best formulation, acquisition value)
         """
         result = differential_evolution(
             func=lambda x: self._objective_with_penalty(x, y_best, found_candidates),
@@ -267,7 +301,7 @@ class BayesianOptimizer:
             disp=False,
         )
         
-        return result.x, -result.fun  # Return positive EI
+        return result.x, -result.fun  # Return positive acquisition value
     
     def optimize(self, X_observed: np.ndarray, y_observed: np.ndarray,
                  n_candidates: int = None) -> pd.DataFrame:
@@ -287,14 +321,15 @@ class BayesianOptimizer:
         
         if self.is_composite:
             # When using composite model, compute y_best from model predictions
-            # Raw y_observed may contain literature values (up to 100%) that the
-            # composite model would predict much lower, making EI near-zero everywhere
             y_pred = self.gp.predict(X_observed)
             y_best = np.max(y_pred)
             print(f"Best model-predicted viability: {y_best:.1f}% (raw observed max: {np.max(y_observed):.1f}%)")
         else:
-            y_best = np.max(y_observed)
+            X_scaled = self.scaler.transform(X_observed)
+            y_pred = self.gp.predict(X_scaled)
+            y_best = np.max(y_pred)
             print(f"Best observed viability: {y_best:.1f}%")
+            
         print(f"Running batch-mode DE optimization for {n_candidates} candidates...")
         print(f"  Diversity penalty: {self.config.diversity_penalty}, radius: {self.config.diversity_radius}")
         
@@ -326,8 +361,11 @@ class BayesianOptimizer:
                 x_scaled = self.scaler.transform(x_reshaped)
                 pred_mean, pred_std = self.gp.predict(x_scaled, return_std=True)
             
-            # Recalculate pure EI (without diversity penalty) for accurate reporting
-            pure_ei = -expected_improvement(x_opt, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
+            # Recalculate pure acquisition value (without diversity penalty) for accurate reporting
+            if self.config.acquisition.lower() == 'ei':
+                pure_acq = expected_improvement(x_opt, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
+            else:
+                pure_acq = upper_confidence_bound(x_opt, self.gp, self.scaler, self.config.kappa, self.is_composite)
             
             # Calculate DMSO percentage
             dmso_molar = x_opt[self.dmso_index] if self.dmso_index >= 0 else 0
@@ -335,7 +373,7 @@ class BayesianOptimizer:
             
             candidates.append({
                 'formulation': x_opt.copy(),
-                'ei_value': pure_ei,
+                'acq_value': pure_acq,
                 'predicted_viability': pred_mean[0],
                 'uncertainty': pred_std[0],
                 'dmso_percent': dmso_percent,
@@ -356,7 +394,7 @@ class BayesianOptimizer:
         for rank, c in enumerate(candidates, 1):
             row = {
                 'rank': rank,
-                'expected_improvement': c['ei_value'],
+                'acquisition_value': c['acq_value'],
                 'predicted_viability': c['predicted_viability'],
                 'uncertainty': c['uncertainty'],
                 'dmso_percent': c['dmso_percent'],
@@ -435,7 +473,7 @@ def export_candidates(candidates_df: pd.DataFrame, feature_names: List[str],
         
         for _, row in candidates_df.iterrows():
             f.write(f"Rank {int(row['rank'])}: {format_formulation(row, feature_names)}\n")
-            f.write(f"  Expected Improvement: {row['expected_improvement']:.4f}\n")
+            f.write(f"  Acquisition Value: {row['acquisition_value']:.4f}\n")
             f.write(f"  Predicted viability: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%\n")
             f.write(f"  DMSO: {row['dmso_percent']:.1f}%\n")
             f.write(f"  Ingredients: {int(row['n_ingredients'])}\n\n")
@@ -537,7 +575,7 @@ def main():
     print("Top 20 General Candidates (by Predicted Viability)")
     print("=" * 80)
     for _, row in general_candidates.head(20).iterrows():
-        print(f"\nRank {int(row['rank'])}: EI = {row['expected_improvement']:.4f}")
+        print(f"\nRank {int(row['rank'])}: {config.acquisition.upper()} = {row['acquisition_value']:.4f}")
         print(f"  Predicted: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
     
@@ -545,7 +583,7 @@ def main():
     print("Top 20 DMSO-Free Candidates")
     print("=" * 80)
     for _, row in dmso_free_candidates.head(20).iterrows():
-        print(f"\nRank {int(row['rank'])}: EI = {row['expected_improvement']:.4f}")
+        print(f"\nRank {int(row['rank'])}: {config.acquisition.upper()} = {row['acquisition_value']:.4f}")
         print(f"  Predicted: {row['predicted_viability']:.1f}% ± {row['uncertainty']:.1f}%")
         print(f"  DMSO: {row['dmso_percent']:.1f}%, Ingredients: {int(row['n_ingredients'])}")
     

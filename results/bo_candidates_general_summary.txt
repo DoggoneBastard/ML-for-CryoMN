@@ -1,124 +1,124 @@
 ================================================================================
 CryoMN Bayesian Optimization Candidates (DE-based)
-Generated: 2026-02-25 18:34
+Generated: 2026-02-25 18:52
 ================================================================================
 
-Rank 1: 2.85M creatine + 1.1% dextran + 2.00M ethylene_glycol + 74.8% fbs + 3.02M glucose + 1.39M glycerol + 0.9% hes + 1.6% human_serum + 1.2% methylcellulose + 1.61M propylene_glycol
-  Expected Improvement: 2.6321
-  Predicted viability: 27.7% ± 23.9%
+Rank 1: 0.0% dextran + 442.8µM dmso + 3.1mM ectoin + 27.9% fbs + 1.93M glycerol + 7.3% hsa + 0.0% human_serum + 0.0% hyaluronic_acid + 1.2mM proline + 53.7µM propylene_glycol
+  Acquisition Value: 69.0236
+  Predicted viability: 61.4% ± 15.2%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 2: 8.33M creatine + 2.7% dextran + 53.7% fbs + 3.33M glucose + 1.61M glycerol + 4.3% hsa + 4.3% human_serum + 1.5% hyaluronic_acid + 1.6% methylcellulose + 1.90M propylene_glycol
-  Expected Improvement: 2.5960
+Rank 2: 2.2% dextran + 1.43M ethylene_glycol + 45.0% fbs + 2.51M glucose + 2.14M glycerol + 3.2% hes + 8.9% hsa + 2.2% human_serum + 1.4% hyaluronic_acid + 3.4% peg_3350
+  Acquisition Value: 39.5364
+  Predicted viability: 27.6% ± 23.9%
+  DMSO: 0.0%
+  Ingredients: 10
+
+Rank 3: 5.83M creatine + 2.3% dextran + 20.9% fbs + 1.95M glucose + 2.8% hes + 5.0% hsa + 1.9% human_serum + 1.0% hyaluronic_acid + 1.1% methylcellulose + 2.06M propylene_glycol
+  Acquisition Value: 39.4801
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 3: 8.20M creatine + 0.8% dextran + 88.7% fbs + 2.80M glucose + 5.4% hes + 9.6% hsa + 0.9% human_serum + 2.32M propylene_glycol + 0.9% pvp + 838.6mM raffinose
-  Expected Improvement: 2.5959
+Rank 4: 2.13M creatine + 1.44M ethylene_glycol + 68.1% fbs + 2.54M glucose + 2.46M glycerol + 1.8% hes + 7.3% hsa + 7.7% human_serum + 1.0% hyaluronic_acid + 1.48M propylene_glycol
+  Acquisition Value: 39.4761
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 4: 3.87M creatine + 7.0% dextran + 2.7% fbs + 2.81M glucose + 2.15M glycerol + 1.4% hes + 2.1% hsa + 5.8% human_serum + 1.3% peg_3350 + 922.3mM propylene_glycol
-  Expected Improvement: 2.5957
+Rank 5: 4.71M creatine + 3.3% dextran + 85.2% fbs + 4.85M glucose + 1.75M glycerol + 3.4% hsa + 1.2% methylcellulose + 1.5% peg_3350 + 1.18M propylene_glycol + 1.5% pvp
+  Acquisition Value: 39.4703
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 5: 7.2% dextran + 74.3% fbs + 6.78M glucose + 2.17M glycerol + 3.6% hes + 8.8% hsa + 7.3% human_serum + 1.2% hyaluronic_acid + 0.9% pvp + 950.3mM raffinose
-  Expected Improvement: 2.5957
+Rank 6: 2.07M creatine + 1.1% dextran + 10.8% fbs + 6.92M glucose + 1.16M glycerol + 3.2% hes + 3.4% hsa + 2.9% human_serum + 1.7% hyaluronic_acid + 1.33M propylene_glycol
+  Acquisition Value: 39.4688
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 6: 7.23M creatine + 2.7% dextran + 1.24M ethylene_glycol + 35.7% fbs + 8.90M glucose + 5.8% hes + 8.7% hsa + 2.7% human_serum + 1.54M propylene_glycol + 917.7mM sucrose
-  Expected Improvement: 2.5957
+Rank 7: 1.89M creatine + 3.2% dextran + 54.2% fbs + 4.67M glucose + 1.44M glycerol + 5.5% hes + 3.3% hsa + 3.5% human_serum + 1.3% peg_3350 + 1.92M propylene_glycol
+  Acquisition Value: 39.4687
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 7: 4.8% dextran + 2.22M ethylene_glycol + 23.7% fbs + 1.84M glycerol + 9.4% hes + 7.1% hsa + 29.2% human_serum + 1.5% peg_3350 + 1.55M propylene_glycol + 4.8% pvp
-  Expected Improvement: 2.5957
+Rank 8: 2.16M ethylene_glycol + 58.1% fbs + 5.34M glucose + 2.21M glycerol + 2.8% hes + 5.3% hsa + 3.6% human_serum + 1.2% hyaluronic_acid + 1.4% methylcellulose + 3.2% peg_3350
+  Acquisition Value: 39.4682
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 8: 1.09M creatine + 7.8% dextran + 27.2% fbs + 9.54M glucose + 1.4% hes + 6.2% hsa + 54.8% human_serum + 5.8% peg_3350 + 9.9% pvp + 985.1mM raffinose
-  Expected Improvement: 2.5957
+Rank 9: 2.80M creatine + 7.9% dextran + 10.3% fbs + 1.21M glucose + 2.49M glycerol + 1.8% hes + 9.9% hsa + 1.8% human_serum + 1.9% hyaluronic_acid + 2.8% peg_3350
+  Acquisition Value: 39.4653
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 9: 6.66M creatine + 2.4% dextran + 45.7% fbs + 2.45M glycerol + 9.3% hes + 88.0% human_serum + 1.79M propylene_glycol + 2.0% pvp + 967.2mM raffinose + 923.6mM sucrose
-  Expected Improvement: 2.5957
+Rank 10: 7.57M creatine + 1.5% dextran + 1.97M ethylene_glycol + 10.6% fbs + 2.42M glycerol + 2.3% hes + 9.7% hsa + 1.4% methylcellulose + 2.7% peg_3350 + 2.44M propylene_glycol
+  Acquisition Value: 39.4643
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 10: 7.76M creatine + 9.8% dextran + 53.4% fbs + 9.5% hes + 6.0% hsa + 64.9% human_serum + 1.8% hyaluronic_acid + 5.7% peg_3350 + 8.4% pvp + 994.8mM sucrose
-  Expected Improvement: 2.5957
+Rank 11: 3.46M creatine + 2.1% dextran + 39.6% fbs + 8.38M glucose + 1.85M glycerol + 4.2% hsa + 3.5% human_serum + 1.3% hyaluronic_acid + 1.3% methylcellulose + 1.4% peg_3350
+  Acquisition Value: 39.4632
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 11: 9.98M creatine + 7.5% dextran + 2.35M ethylene_glycol + 71.3% fbs + 9.27M glucose + 2.36M glycerol + 78.8% human_serum + 8.3% peg_3350 + 1.34M propylene_glycol + 2.4% pvp
-  Expected Improvement: 2.5957
+Rank 12: 8.33M creatine + 2.7% dextran + 53.7% fbs + 3.33M glucose + 1.61M glycerol + 4.3% hsa + 4.3% human_serum + 1.5% hyaluronic_acid + 1.6% methylcellulose + 1.90M propylene_glycol
+  Acquisition Value: 39.4627
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 12: 1.49M creatine + 2.40M ethylene_glycol + 16.9% fbs + 3.87M glucose + 5.4% hes + 8.9% hsa + 83.7% human_serum + 2.0% hyaluronic_acid + 1.7% methylcellulose + 4.2% peg_3350
-  Expected Improvement: 2.5957
+Rank 13: 4.48M creatine + 4.9% dextran + 55.0% fbs + 3.13M glucose + 2.03M glycerol + 7.9% hes + 2.0% hsa + 1.6% human_serum + 2.8% peg_3350 + 1.55M propylene_glycol
+  Acquisition Value: 39.4610
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 13: 2.26M creatine + 9.9% dextran + 73.4% fbs + 1.48M glucose + 8.3% hes + 67.5% human_serum + 1.9% methylcellulose + 9.0% peg_3350 + 2.00M propylene_glycol + 6.1% pvp
-  Expected Improvement: 2.5957
+Rank 14: 6.81M creatine + 5.4% dextran + 23.6% fbs + 5.91M glucose + 1.68M glycerol + 3.3% hes + 6.6% hsa + 5.6% human_serum + 1.6% methylcellulose + 2.01M propylene_glycol
+  Acquisition Value: 39.4609
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 14: 2.04M creatine + 4.0% dextran + 72.9% fbs + 6.81M glucose + 2.32M glycerol + 9.4% hsa + 86.9% human_serum + 8.8% peg_3350 + 6.8% pvp + 961.1mM sucrose
-  Expected Improvement: 2.5957
+Rank 15: 3.3% dextran + 2.49M ethylene_glycol + 61.1% fbs + 1.91M glycerol + 3.3% hes + 7.2% hsa + 13.4% human_serum + 5.4% peg_3350 + 1.05M propylene_glycol + 7.1% pvp
+  Acquisition Value: 39.4609
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 15: 6.96M creatine + 8.8% dextran + 1.13M ethylene_glycol + 59.4% fbs + 5.88M glucose + 4.5% hes + 73.6% human_serum + 1.7% hyaluronic_acid + 0.9% pvp + 840.8mM trehalose
-  Expected Improvement: 2.5957
+Rank 16: 6.56M creatine + 3.8% dextran + 25.8% fbs + 2.15M glucose + 2.19M glycerol + 9.1% hes + 6.8% hsa + 3.7% human_serum + 1.6% peg_3350 + 2.24M propylene_glycol
+  Acquisition Value: 39.4608
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 16: 5.62M glucose + 1.8% hes + 8.3% hsa + 44.1% human_serum + 2.0% hyaluronic_acid + 1.3% methylcellulose + 4.8% peg_3350 + 2.01M propylene_glycol + 8.4% pvp + 960.6mM sucrose
-  Expected Improvement: 2.5957
+Rank 17: 6.1% dextran + 2.00M ethylene_glycol + 38.3% fbs + 1.43M glycerol + 6.2% hes + 1.4% hsa + 47.0% human_serum + 8.1% peg_3350 + 1.07M propylene_glycol + 7.0% pvp
+  Acquisition Value: 39.4607
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 17: 3.31M creatine + 7.7% dextran + 84.7% fbs + 2.52M glucose + 1.60M glycerol + 9.5% hsa + 81.8% human_serum + 5.0% peg_3350 + 2.35M propylene_glycol + 974.9mM trehalose
-  Expected Improvement: 2.5957
+Rank 18: 2.2% dextran + 1.63M ethylene_glycol + 20.2% fbs + 1.89M glycerol + 2.4% hes + 1.6% hsa + 65.2% human_serum + 5.3% peg_3350 + 1.43M propylene_glycol + 1.7% pvp
+  Acquisition Value: 39.4607
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 18: 6.00M creatine + 10.1% fbs + 9.88M glucose + 8.0% hes + 0.7% hsa + 25.0% human_serum + 9.4% peg_3350 + 1.50M propylene_glycol + 0.9% pvp + 794.2mM trehalose
-  Expected Improvement: 2.5957
+Rank 19: 7.23M creatine + 2.7% dextran + 1.24M ethylene_glycol + 35.7% fbs + 8.90M glucose + 5.8% hes + 8.7% hsa + 2.7% human_serum + 1.54M propylene_glycol + 917.6mM sucrose
+  Acquisition Value: 39.4607
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10
 
-Rank 19: 9.43M creatine + 5.7% dextran + 62.8% fbs + 8.99M glucose + 2.47M glycerol + 8.2% hes + 9.2% hsa + 20.5% human_serum + 1.8% methylcellulose + 9.6% peg_3350
-  Expected Improvement: 2.5957
-  Predicted viability: 27.5% ± 23.9%
-  DMSO: 0.0%
-  Ingredients: 10
-
-Rank 20: 3.12M creatine + 1.69M ethylene_glycol + 84.6% fbs + 6.45M glucose + 2.23M glycerol + 7.1% hsa + 4.5% human_serum + 1.9% hyaluronic_acid + 9.8% peg_3350 + 8.9% pvp
-  Expected Improvement: 2.5957
+Rank 20: 8.81M creatine + 4.7% dextran + 868.3mM ethylene_glycol + 81.8% fbs + 1.9% hes + 2.4% hsa + 8.8% human_serum + 1.2% hyaluronic_acid + 1.2% peg_3350 + 876.3mM propylene_glycol
+  Acquisition Value: 39.4607
   Predicted viability: 27.5% ± 23.9%
   DMSO: 0.0%
   Ingredients: 10

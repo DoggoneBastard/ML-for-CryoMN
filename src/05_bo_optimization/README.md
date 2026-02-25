@@ -33,11 +33,11 @@ The script auto-detects which model to use and prints the selection:
 1. Load trained model (composite if available, otherwise standard GP)
 2. Compute `y_best` from model predictions on observed data
 3. For each candidate (sequentially):
-   - Run Differential Evolution to find `x* = argmax(EI(x) - penalty(x))`
+   - Run Differential Evolution to find `x* = argmax(UCB(x) - penalty(x))`
    - DE explores the entire search space globally
    - **Batch diversity**: Gaussian penalty repels DE away from previously found candidates
    - Constraint violations (DMSO, ingredient count) are penalized
-4. Recalculate pure EI (without penalty) for accurate reporting
+4. Recalculate pure UCB (without penalty) for accurate reporting
 5. Rank candidates by predicted viability
 6. Export with predictions and uncertainty estimates
 
@@ -51,41 +51,44 @@ penalty(x) = Σ_i  strength · exp(-0.5 · ||x - x_i||² / r²)
 
 Where `strength` and `r` (radius) control how strongly candidates repel each other. This ensures each new candidate explores a different region of formulation space.
 
-### Expected Improvement (EI)
+### Upper Confidence Bound (UCB)
 
-EI balances **exploration** and **exploitation**:
+This optimizer uses the **Upper Confidence Bound (UCB)** acquisition function rather than Expected Improvement (EI). 
 
 ```
-EI(x) = (μ(x) - y_best - ξ) · Φ(Z) + σ(x) · φ(Z)
+UCB(x) = μ(x) + κ · σ(x)
 ```
 
 Where:
 - `μ(x)` = GP predicted mean
 - `σ(x)` = GP predicted uncertainty
-- `y_best` = best model-predicted viability (composite) or observed (standard)
-- `ξ` = exploration parameter
+- `κ` (kappa) = Exploration weight
 
-High EI means: either high predicted viability OR high uncertainty (unexplored region).
+**Why UCB instead of EI?**
+In high-dimensional spaces (e.g., 21 ingredients) with limited data, almost the entire formulation space is "out-of-distribution" (the void). In the void, the model reverts to its prior mean (~27.5%) with maximum uncertainty (~24%). 
+
+Because EI mathematically rewards pure uncertainty, an EI-driven optimizer will actively dive into the flat void rather than staying near known good recipes. UCB (with a tuned `kappa`) places proportional weight on the *predicted mean*, anchoring the optimizer to known high-performing peaks while still exploring slightly uncertain edges.
 
 ### Configuration
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `acquisition` | `ucb` | Acquisition function to use (`ucb` or `ei`) |
 | `max_ingredients` | 10 | Max non-zero ingredients per formulation |
 | `max_dmso_percent` | 5.0 | Max DMSO (general), 0.5% (DMSO-free) |
 | `n_candidates` | 20 | Number of diverse candidates to generate |
-| `xi` | 0.01 | EI exploration parameter |
+| `kappa` | 0.5 | UCB exploration parameter |
 | `de_maxiter` | 100 | DE iterations per candidate |
 | `de_popsize` | 15 | DE population size |
 | `diversity_penalty` | 5.0 | Strength of batch diversity repulsion |
-| `diversity_radius` | 0.3 | Fraction of feature range for penalty radius |
+| `diversity_radius` | 0.05 | Narrow radius; forces variations *around* the peak instead of pushing candidates completely into the void |
 
 ## Comparison: Random Sampling vs DE-based BO
 
 | Aspect | `03_optimization` | `05_bo_optimization` |
 |--------|-------------------|----------------------|
 | **Search** | Random sampling | Differential Evolution |
-| **Acquisition** | Sorts by mean only | Maximizes EI |
+| **Acquisition** | Sorts by mean only | Maximizes UCB/EI |
 | **Exploration** | Pure exploitation | Balanced |
 | **Diversity** | Naturally diverse (random) | Batch-mode penalization |
 | **Speed** | Fast (~seconds) | Slower (~minutes) |
