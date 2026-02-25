@@ -15,8 +15,12 @@ python src/03_optimization/optimize_formulation.py
 
 ## Input
 
-- **Model**: `models/gp_model.pkl`
+- **Model**: `models/composite_model.pkl` (preferred) or `models/gp_model.pkl` (fallback)
 - **Data**: `data/processed/parsed_formulations.csv`
+
+The script auto-detects which model to use and prints the selection:
+- `>>> Using COMPOSITE model (literature prior + wet lab correction)` — after running `04_validation_loop`
+- `>>> Using STANDARD GP model (literature-only)` — before any validation data is added
 
 ## Output
 
@@ -26,10 +30,10 @@ python src/03_optimization/optimize_formulation.py
 
 ## Algorithm
 
-1. Load trained GP model
+1. Load trained model (composite if available, otherwise standard GP)
 2. Generate large pool of random formulations (50× target count)
 3. Filter by constraints (max DMSO, max ingredients)
-4. Use GP to predict viability for each candidate
+4. Use model to predict viability for each candidate
 5. Rank by predicted viability (highest mean)
 6. Select top-N candidates
 
@@ -48,6 +52,7 @@ python src/03_optimization/optimize_formulation.py
 | **Method** | Random sampling | Differential Evolution |
 | **Selection** | Highest predicted mean | Highest Expected Improvement |
 | **Exploration** | None (pure exploitation) | Balanced via uncertainty |
+| **Diversity** | Naturally diverse (random) | Batch-mode penalization |
 | **Speed** | Fast (~seconds) | Slower (~minutes) |
 | **Best for** | Quick generation | Most informative experiments |
 
@@ -75,13 +80,6 @@ rank,predicted_viability,uncertainty,dmso_percent,n_ingredients,dmso_M,trehalose
 from src.03_optimization.optimize_formulation import FormulationOptimizer, OptimizationConfig
 
 config = OptimizationConfig(max_dmso_percent=0.0, n_candidates=50)
-optimizer = FormulationOptimizer(gp, scaler, feature_names, config)
+optimizer = FormulationOptimizer(gp, scaler, feature_names, config, is_composite=True)
 candidates = optimizer.generate_low_dmso_candidates(X, y)
 ```
-
-## Latest Results
-
-| Category | Top Candidate | Predicted Viability |
-|----------|---------------|---------------------|
-| General (≤5% DMSO) | 3-ingredient DMSO-free | 72.3% ± 23.5% |
-| DMSO-free | 2-ingredient formulation | 81.6% ± 20.6% |

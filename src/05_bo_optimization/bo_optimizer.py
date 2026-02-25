@@ -47,6 +47,8 @@ class BOConfig:
     de_maxiter: int = 100  # DE iterations per candidate
     de_popsize: int = 15  # DE population size
     random_seed: int = 42
+    diversity_penalty: float = 5.0  # Strength of local penalization for batch diversity
+    diversity_radius: float = 0.3  # Fraction of feature range for penalty radius
 
 
 # =============================================================================
@@ -190,9 +192,40 @@ class BayesianOptimizer:
                 x_sparse[idx] = 0.0
         return x_sparse
     
-    def _objective_with_penalty(self, x: np.ndarray, y_best: float) -> float:
+    def _local_penalizer(self, x: np.ndarray, found_candidates: List[np.ndarray]) -> float:
         """
-        Objective function for DE: negative EI + constraint penalties.
+        Compute local penalty to push DE away from previously found candidates.
+        Uses Gaussian-shaped repulsion centered on each found candidate.
+        
+        Args:
+            x: Current candidate formulation
+            found_candidates: List of previously found formulation vectors
+            
+        Returns:
+            Penalty value (higher = more repulsion)
+        """
+        if not found_candidates:
+            return 0.0
+        
+        # Compute characteristic length scale from feature bounds
+        ranges = np.array([b[1] - b[0] for b in self.bounds])
+        ranges = np.maximum(ranges, 1e-6)  # Avoid division by zero
+        length_scale = ranges * self.config.diversity_radius
+        
+        penalty = 0.0
+        for prev in found_candidates:
+            # Normalized squared distance
+            diff = (x - prev) / length_scale
+            dist_sq = np.sum(diff ** 2)
+            # Gaussian repulsion
+            penalty += self.config.diversity_penalty * np.exp(-0.5 * dist_sq)
+        
+        return penalty
+    
+    def _objective_with_penalty(self, x: np.ndarray, y_best: float,
+                                found_candidates: List[np.ndarray] = None) -> float:
+        """
+        Objective function for DE: negative EI + constraint penalties + diversity penalty.
         """
         # Sparsify first to enforce ingredient constraint
         x_sparse = self._sparsify(x)
@@ -205,17 +238,27 @@ class BayesianOptimizer:
         if self.dmso_index >= 0 and x_sparse[self.dmso_index] > self.max_dmso_molar:
             penalty += (x_sparse[self.dmso_index] - self.max_dmso_molar) * 50.0
         
+        # Batch diversity penalty: repel from previously found candidates
+        if found_candidates:
+            penalty += self._local_penalizer(x_sparse, found_candidates)
+        
         return neg_ei + penalty
     
-    def _run_de_single(self, y_best: float, seed: int) -> Tuple[np.ndarray, float]:
+    def _run_de_single(self, y_best: float, seed: int,
+                       found_candidates: List[np.ndarray] = None) -> Tuple[np.ndarray, float]:
         """
         Run a single DE optimization to find one candidate.
         
+        Args:
+            y_best: Best observed viability
+            seed: Random seed for DE
+            found_candidates: Previously found candidates for diversity penalty
+            
         Returns:
             Tuple of (best formulation, EI value)
         """
         result = differential_evolution(
-            func=lambda x: self._objective_with_penalty(x, y_best),
+            func=lambda x: self._objective_with_penalty(x, y_best, found_candidates),
             bounds=self.bounds,
             maxiter=self.config.de_maxiter,
             popsize=self.config.de_popsize,
@@ -252,13 +295,15 @@ class BayesianOptimizer:
         else:
             y_best = np.max(y_observed)
             print(f"Best observed viability: {y_best:.1f}%")
-        print(f"Running DE optimization for {n_candidates} candidates...")
+        print(f"Running batch-mode DE optimization for {n_candidates} candidates...")
+        print(f"  Diversity penalty: {self.config.diversity_penalty}, radius: {self.config.diversity_radius}")
         
         candidates = []
+        found_formulations = []  # Track found candidates for diversity penalty
         
         for i in range(n_candidates):
             seed = self.config.random_seed + i
-            x_opt, ei_value = self._run_de_single(y_best, seed)
+            x_opt, _ = self._run_de_single(y_best, seed, found_formulations)
             
             # Enforce constraints by clipping
             if self.dmso_index >= 0:
@@ -281,24 +326,30 @@ class BayesianOptimizer:
                 x_scaled = self.scaler.transform(x_reshaped)
                 pred_mean, pred_std = self.gp.predict(x_scaled, return_std=True)
             
+            # Recalculate pure EI (without diversity penalty) for accurate reporting
+            pure_ei = -expected_improvement(x_opt, self.gp, self.scaler, y_best, self.config.xi, self.is_composite)
+            
             # Calculate DMSO percentage
             dmso_molar = x_opt[self.dmso_index] if self.dmso_index >= 0 else 0
             dmso_percent = dmso_molar * 78.13 / (1.10 * 10)
             
             candidates.append({
                 'formulation': x_opt.copy(),
-                'ei_value': ei_value,
+                'ei_value': pure_ei,
                 'predicted_viability': pred_mean[0],
                 'uncertainty': pred_std[0],
                 'dmso_percent': dmso_percent,
                 'n_ingredients': count_nonzero(x_opt),
             })
             
+            # Track this candidate for diversity penalty in subsequent DE runs
+            found_formulations.append(x_opt.copy())
+            
             if (i + 1) % 5 == 0:
                 print(f"  Generated {i + 1}/{n_candidates} candidates...")
         
-        # Sort by EI value (higher is better - more informative to test)
-        candidates.sort(key=lambda c: c['ei_value'], reverse=True)
+        # Sort by predicted viability (primary ranking for diverse batch candidates)
+        candidates.sort(key=lambda c: c['predicted_viability'], reverse=True)
         
         # Build output DataFrame
         output_data = []
@@ -483,7 +534,7 @@ def main():
     
     # Print top candidates
     print("\n" + "=" * 80)
-    print("Top 20 General Candidates (by Expected Improvement)")
+    print("Top 20 General Candidates (by Predicted Viability)")
     print("=" * 80)
     for _, row in general_candidates.head(20).iterrows():
         print(f"\nRank {int(row['rank'])}: EI = {row['expected_improvement']:.4f}")
