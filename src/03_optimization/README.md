@@ -18,9 +18,11 @@ python src/03_optimization/optimize_formulation.py
 - **Model**: `models/composite_model.pkl` (preferred) or `models/gp_model.pkl` (fallback)
 - **Data**: `data/processed/parsed_formulations.csv`
 
-The script auto-detects which model to use and prints the selection:
-- `>>> Using COMPOSITE model (literature prior + wet lab correction)` — after running `04_validation_loop`
-- `>>> Using STANDARD GP model (literature-only)` — before any validation data is added
+The script prioritizes `composite_model.pkl` if it exists, falling back to `gp_model.pkl`, and prints its selection:
+- `>>> Using COMPOSITE model (literature prior + wet lab correction)` — if `composite_model.pkl` is found. This model is specifically created by running `04_validation_loop/update_model_weighted_prior.py`.
+- `>>> Using STANDARD GP model (literature-only)` — if falling back to `gp_model.pkl`. This occurs before any validation data is added, or if you used the other validation scripts (`update_model.py` or `update_model_weighted_simple.py`) and no composite model exists.
+
+> **Note**: Because the script strictly checks for `composite_model.pkl` first, if you switch from the `prior` method back to the simple concatenation methods, you must manually delete `composite_model.pkl` so the script correctly falls back to your newly updated `gp_model.pkl`.
 
 ## Output
 
