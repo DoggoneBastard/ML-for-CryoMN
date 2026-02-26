@@ -47,15 +47,5 @@
       "r2": 0.618131155659742,
       "mean_uncertainty": 19.19245034420479
     }
-  },
-  "updated_at": "2026-02-25T17:52:16.473304",
-  "n_validation_samples": 12,
-  "n_literature_samples": 198,
-  "validation_rmse": 2.516110300511131,
-  "literature_only_rmse": 41.883725308361385,
-  "weighting_method": "prior_mean_correction",
-  "alpha_literature": 1.0,
-  "alpha_wetlab": 0.1,
-  "noise_ratio": 10.0,
-  "is_composite_model": true
+  }
 }
