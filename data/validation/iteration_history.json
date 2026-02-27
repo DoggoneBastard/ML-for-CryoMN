@@ -3,12 +3,12 @@
     {
       "iteration": 1,
       "method": "prior_mean_correction",
-      "n_validation_samples": 12,
-      "validation_rmse": 2.516110300511131,
-      "literature_rmse": 41.883725308361385,
-      "improvement": 39.367615007850254,
+      "n_validation_samples": 18,
+      "validation_rmse": 2.4286067415010617,
+      "literature_rmse": 38.46972696321922,
+      "improvement": 36.04112022171816,
       "noise_ratio": 10.0,
-      "timestamp": "2026-02-25T17:52:16.478367"
+      "timestamp": "2026-02-27T16:27:16.791553"
     }
   ]
 }
