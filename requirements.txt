@@ -29,3 +29,9 @@ tqdm>=4.65.0
 
 # Testing
 pytest>=7.4.0
+
+# Literature Review MCP Server
+requests>=2.31.0
+biopython>=1.83
+mcp>=1.0.0
+PyMuPDF>=1.24.0
