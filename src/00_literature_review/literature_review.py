@@ -18,6 +18,7 @@ Tools exposed:
 """
 
 import argparse
+import asyncio
 import re
 import io
 import itertools
@@ -30,7 +31,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
 
-import requests
+import aiohttp
 from Bio import Entrez
 from mcp.server.fastmcp import FastMCP
 
@@ -53,7 +54,9 @@ SEMANTIC_SCHOLAR_FIELDS = (
 OPENALEX_SEARCH_URL = "https://api.openalex.org/works"
 SCOPUS_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
 
-DEFAULT_MAX_RESULTS = 20  # per source
+DEFAULT_MAX_RESULTS = 10  # per source
+REQUEST_TIMEOUT = 60  # seconds for individual HTTP requests
+PDF_TIMEOUT = 45  # seconds for PDF downloads (slightly shorter to leave room)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -306,22 +309,26 @@ _PDF_DOWNLOAD_HEADERS = {
 }
 
 
-def _download_pdf_text(url: str) -> str:
+async def _download_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
     """Download a PDF from *url* and return its extracted text."""
     try:
-        resp = requests.get(url, headers=_PDF_DOWNLOAD_HEADERS, timeout=60)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
+        async with session.get(
+            url, headers=_PDF_DOWNLOAD_HEADERS, timeout=aiohttp.ClientTimeout(total=PDF_TIMEOUT)
+        ) as resp:
+            resp.raise_for_status()
+            pdf_bytes = await resp.read()
+    except Exception as exc:
         logger.warning("PDF download failed (%s): %s", url, exc)
         return ""
-    return _extract_text_from_pdf(resp.content)
+    return _extract_text_from_pdf(pdf_bytes)
 
 
 # ---------------------------------------------------------------------------
 # Semantic Scholar helpers
 # ---------------------------------------------------------------------------
 
-def _search_semantic_scholar(
+async def _search_semantic_scholar(
+    session: aiohttp.ClientSession,
     parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query Semantic Scholar Graph API and return a list of paper dicts."""
@@ -353,26 +360,26 @@ def _search_semantic_scholar(
         params["year"] = f"-{parsed['year_end']}"
 
     try:
-        resp = requests.get(
+        async with session.get(
             SEMANTIC_SCHOLAR_SEARCH_URL,
             headers=headers,
             params=params,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.RequestException as exc:
+            timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    except Exception as exc:
         logger.error("Semantic Scholar request failed: %s", exc)
         return []
 
-    papers: list[dict] = []
     items = data.get("data", [])
     total = len(items)
-    for i, item in enumerate(items, 1):
+
+    # Download PDFs in parallel
+    async def _process_item(i: int, item: dict) -> dict:
         authors = [a.get("name", "") for a in item.get("authors", [])]
         doi = (item.get("externalIds") or {}).get("DOI", "")
 
-        # Attempt to get full text from open-access PDF
         full_text = ""
         oa_pdf = item.get("openAccessPdf") or {}
         pdf_url = oa_pdf.get("url", "")
@@ -380,22 +387,25 @@ def _search_semantic_scholar(
             title_short = item.get("title", "")[:30]
             logger.info("Downloading open-access PDF for: %s", item.get("title", ""))
             set_spinner_message(f"Semantic Scholar: PDF {i}/{total} ({title_short}...)")
-            full_text = _download_pdf_text(pdf_url)
+            full_text = await _download_pdf_text(session, pdf_url)
 
-        papers.append(
-            {
-                "title": item.get("title", ""),
-                "authors": authors,
-                "year": item.get("year"),
-                "abstract": item.get("abstract", ""),
-                "full_text": full_text,
-                "url": item.get("url", ""),
-                "doi": doi,
-                "citation_count": item.get("citationCount"),
-                "source": "Semantic Scholar",
-            }
-        )
-    return papers
+        return {
+            "title": item.get("title", ""),
+            "authors": authors,
+            "year": item.get("year"),
+            "abstract": item.get("abstract", ""),
+            "full_text": full_text,
+            "url": item.get("url", ""),
+            "doi": doi,
+            "citation_count": item.get("citationCount"),
+            "source": "Semantic Scholar",
+        }
+
+    set_spinner_message(f"Semantic Scholar: Downloading {total} PDFs in parallel...")
+    papers = await asyncio.gather(
+        *[_process_item(i, item) for i, item in enumerate(items, 1)]
+    )
+    return list(papers)
 
 
 # ---------------------------------------------------------------------------
@@ -407,6 +417,8 @@ def _fetch_pmc_full_text(pmcid: str) -> str:
 
     Uses Entrez.efetch(db='pmc') to retrieve the JATS/XML and then
     recursively extracts the <body> text content.
+
+    Note: BioPython's Entrez is synchronous; we run it in an executor.
     """
     Entrez.email = PUBMED_EMAIL
     Entrez.api_key = PUBMED_API_KEY
@@ -441,12 +453,14 @@ def _parse_pmc_body(xml_data: bytes | str) -> str:
     return "".join(body.itertext()).strip()
 
 
-def _search_pubmed(
+async def _search_pubmed(
+    session: aiohttp.ClientSession,
     parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query PubMed via NCBI E-Utilities and return a list of paper dicts.
 
     For articles available in PubMed Central, the full text body is fetched.
+    BioPython's Entrez is synchronous, so we run it in a thread executor.
     """
     set_spinner_message("PubMed: Querying esearch API...")
     Entrez.email = PUBMED_EMAIL
@@ -469,13 +483,19 @@ def _search_pubmed(
         return []
     logger.info("PubMed query: %s", pm_query)
 
-    # Step 1: search for IDs
-    try:
+    # Run synchronous Entrez calls in a thread executor
+    loop = asyncio.get_event_loop()
+
+    def _esearch():
         search_handle = Entrez.esearch(
             db="pubmed", term=pm_query, retmax=max_results, sort="relevance"
         )
         search_results = Entrez.read(search_handle)
         search_handle.close()
+        return search_results
+
+    try:
+        search_results = await loop.run_in_executor(None, _esearch)
     except Exception as exc:
         logger.error("PubMed esearch failed: %s", exc)
         return []
@@ -485,25 +505,46 @@ def _search_pubmed(
         return []
 
     set_spinner_message(f"PubMed: Fetching {len(id_list)} XML summaries...")
-    # Step 2: fetch article details as XML
-    try:
+
+    def _efetch():
         fetch_handle = Entrez.efetch(
             db="pubmed", id=",".join(id_list), rettype="xml", retmode="xml"
         )
         xml_data = fetch_handle.read()
         fetch_handle.close()
+        return xml_data
+
+    try:
+        xml_data = await loop.run_in_executor(None, _efetch)
     except Exception as exc:
         logger.error("PubMed efetch failed: %s", exc)
         return []
 
-    return _parse_pubmed_xml(xml_data)
+    # Parse the XML (synchronous, fast)
+    papers_without_fulltext = _parse_pubmed_xml_metadata(xml_data)
+
+    # Fetch PMC full texts in parallel using executor
+    async def _fetch_fulltext(paper: dict) -> dict:
+        pmcid = paper.pop("_pmcid", "")
+        if pmcid:
+            title_short = paper["title"][:30]
+            logger.info("Fetching PMC full text for %s (%s)", paper["title"][:60], pmcid)
+            set_spinner_message(f"PubMed: Fetching PMC ({title_short}...)")
+            full_text = await loop.run_in_executor(None, _fetch_pmc_full_text, pmcid)
+            paper["full_text"] = full_text
+        return paper
+
+    set_spinner_message(f"PubMed: Downloading {len(papers_without_fulltext)} full texts in parallel...")
+    papers = await asyncio.gather(
+        *[_fetch_fulltext(p) for p in papers_without_fulltext]
+    )
+    return list(papers)
 
 
-def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
-    """Parse PubMed XML response into a list of paper dicts.
+def _parse_pubmed_xml_metadata(xml_data: bytes | str) -> list[dict]:
+    """Parse PubMed XML response into a list of paper dicts (without full text).
 
-    If a PMCID is present for an article, we also fetch its full text from
-    PubMed Central.
+    Returns papers with a '_pmcid' field for later full-text fetching.
     """
     papers: list[dict] = []
     try:
@@ -513,8 +554,7 @@ def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
         return []
 
     articles = root.findall(".//PubmedArticle")
-    total = len(articles)
-    for i, article_elem in enumerate(articles, 1):
+    for article_elem in articles:
         medline = article_elem.find("MedlineCitation")
         if medline is None:
             continue
@@ -578,25 +618,18 @@ def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
         pmid = medline.findtext("PMID", default="")
         url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/" if pmid else ""
 
-        # Fetch full text from PMC if available
-        full_text = ""
-        if pmcid:
-            title_short = title[:30]
-            logger.info("Fetching PMC full text for %s (%s)", title[:60], pmcid)
-            set_spinner_message(f"PubMed: Fetching PMC {i}/{total} ({title_short}...)")
-            full_text = _fetch_pmc_full_text(pmcid)
-
         papers.append(
             {
                 "title": title,
                 "authors": authors,
                 "year": year,
                 "abstract": abstract,
-                "full_text": full_text,
+                "full_text": "",
                 "url": url,
                 "doi": doi,
                 "citation_count": None,
                 "source": "PubMed",
+                "_pmcid": pmcid,  # temporary field for full-text fetch
             }
         )
     return papers
@@ -622,7 +655,8 @@ def _reconstruct_abstract(inverted_index: dict) -> str:
     return " ".join(word for _, word in word_positions)
 
 
-def _search_openalex(
+async def _search_openalex(
+    session: aiohttp.ClientSession,
     parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query the OpenAlex Works API and return a list of paper dicts."""
@@ -649,31 +683,31 @@ def _search_openalex(
     if parsed['author']:
         set_spinner_message("OpenAlex: Resolving author ID...")
         try:
-            author_resp = requests.get(
+            async with session.get(
                 "https://api.openalex.org/authors",
                 params={"search": parsed['author'], "per_page": 1,
                         "api_key": OPENALEX_API_KEY},
-                timeout=15,
-            )
-            author_resp.raise_for_status()
-            author_data = author_resp.json()
-            author_results = author_data.get("results", [])
-            if author_results:
-                oa_id = author_results[0]["id"].replace(
-                    "https://openalex.org/", ""
-                )
-                filters.append(f"author.id:{oa_id}")
-                logger.info(
-                    "OpenAlex author resolved: %s → %s",
-                    parsed['author'], oa_id,
-                )
-            else:
-                # Fall back to putting author name in the search param
-                search_parts = [parsed['author']]
-                if parsed['topic']:
-                    search_parts.append(parsed['topic'])
-                params["search"] = ' '.join(search_parts)
-        except requests.RequestException as exc:
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as author_resp:
+                author_resp.raise_for_status()
+                author_data = await author_resp.json()
+                author_results = author_data.get("results", [])
+                if author_results:
+                    oa_id = author_results[0]["id"].replace(
+                        "https://openalex.org/", ""
+                    )
+                    filters.append(f"author.id:{oa_id}")
+                    logger.info(
+                        "OpenAlex author resolved: %s → %s",
+                        parsed['author'], oa_id,
+                    )
+                else:
+                    # Fall back to putting author name in the search param
+                    search_parts = [parsed['author']]
+                    if parsed['topic']:
+                        search_parts.append(parsed['topic'])
+                    params["search"] = ' '.join(search_parts)
+        except Exception as exc:
             logger.warning("OpenAlex author lookup failed: %s", exc)
             # Fall back to keyword search
             search_parts = [parsed['author']]
@@ -699,19 +733,22 @@ def _search_openalex(
     logger.info("OpenAlex params: %s", params)
 
     try:
-        resp = requests.get(
-            OPENALEX_SEARCH_URL, params=params, timeout=30
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.RequestException as exc:
+        async with session.get(
+            OPENALEX_SEARCH_URL,
+            params=params,
+            timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    except Exception as exc:
         logger.error("OpenAlex request failed: %s", exc)
         return []
 
-    papers: list[dict] = []
     items = data.get("results", [])
     total = len(items)
-    for i, item in enumerate(items, 1):
+
+    # Download PDFs in parallel
+    async def _process_item(i: int, item: dict) -> dict:
         # Authors
         authors = []
         for authorship in item.get("authorships", []):
@@ -741,32 +778,36 @@ def _search_openalex(
             set_spinner_message(
                 f"OpenAlex: PDF {i}/{total} ({title_short}...)"
             )
-            full_text = _download_pdf_text(pdf_url)
+            full_text = await _download_pdf_text(session, pdf_url)
 
         openalex_id = item.get("id", "")
         url = openalex_id if openalex_id else ""
 
-        papers.append(
-            {
-                "title": item.get("title", ""),
-                "authors": authors,
-                "year": item.get("publication_year"),
-                "abstract": abstract,
-                "full_text": full_text,
-                "url": url,
-                "doi": doi,
-                "citation_count": item.get("cited_by_count"),
-                "source": "OpenAlex",
-            }
-        )
-    return papers
+        return {
+            "title": item.get("title", ""),
+            "authors": authors,
+            "year": item.get("publication_year"),
+            "abstract": abstract,
+            "full_text": full_text,
+            "url": url,
+            "doi": doi,
+            "citation_count": item.get("cited_by_count"),
+            "source": "OpenAlex",
+        }
+
+    set_spinner_message(f"OpenAlex: Downloading {total} PDFs in parallel...")
+    papers = await asyncio.gather(
+        *[_process_item(i, item) for i, item in enumerate(items, 1)]
+    )
+    return list(papers)
 
 
 # ---------------------------------------------------------------------------
 # Scopus (Elsevier) helpers
 # ---------------------------------------------------------------------------
 
-def _search_scopus(
+async def _search_scopus(
+    session: aiohttp.ClientSession,
     parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query the Elsevier Scopus Search API and return a list of paper dicts."""
@@ -805,12 +846,15 @@ def _search_scopus(
     }
 
     try:
-        resp = requests.get(
-            SCOPUS_SEARCH_URL, headers=headers, params=params, timeout=30
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.RequestException as exc:
+        async with session.get(
+            SCOPUS_SEARCH_URL,
+            headers=headers,
+            params=params,
+            timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+    except Exception as exc:
         logger.error("Scopus request failed: %s", exc)
         return []
 
@@ -986,10 +1030,10 @@ def _format_results(papers: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Core search logic (shared by CLI and MCP)
+# Core search logic (shared by CLI and MCP) – now async
 # ---------------------------------------------------------------------------
 
-def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -> str:
+async def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -> str:
     """Run the literature search pipeline and return formatted markdown."""
     parsed = _parse_query(query)
     logger.info(
@@ -997,10 +1041,15 @@ def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -
         query, parsed, max_results_per_source,
     )
 
-    ss_papers = _search_semantic_scholar(parsed, max_results_per_source)
-    pm_papers = _search_pubmed(parsed, max_results_per_source)
-    oa_papers = _search_openalex(parsed, max_results_per_source)
-    sc_papers = _search_scopus(parsed, max_results_per_source)
+    # Run all four source searches in parallel
+    async with aiohttp.ClientSession() as session:
+        set_spinner_message("Querying all 4 sources in parallel...")
+        ss_papers, pm_papers, oa_papers, sc_papers = await asyncio.gather(
+            _search_semantic_scholar(session, parsed, max_results_per_source),
+            _search_pubmed(session, parsed, max_results_per_source),
+            _search_openalex(session, parsed, max_results_per_source),
+            _search_scopus(session, parsed, max_results_per_source),
+        )
 
     logger.info(
         "Found %d from Semantic Scholar, %d from PubMed, "
@@ -1026,7 +1075,7 @@ def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-def search_literature(
+async def search_literature(
     query: str,
     max_results_per_source: int = DEFAULT_MAX_RESULTS,
 ) -> str:
@@ -1040,9 +1089,9 @@ def search_literature(
         query: Natural language search query describing the topic of interest
                (e.g. "machine learning for cryo-electron microscopy").
         max_results_per_source: Maximum number of results to fetch from each
-                                 source (default 20).
+                                  source (default 10).
     """
-    return _run_search(query, max_results_per_source)
+    return await _run_search(query, max_results_per_source)
 
 
 # ---------------------------------------------------------------------------
@@ -1064,7 +1113,7 @@ def _cli_search(args: argparse.Namespace) -> None:
     _cli_spinner = Spinner("Starting search...")
     _cli_spinner.start()
     try:
-        result = _run_search(query, args.max_results)
+        result = asyncio.run(_run_search(query, args.max_results))
     finally:
         _cli_spinner.stop()
         logger.setLevel(logging.INFO)
