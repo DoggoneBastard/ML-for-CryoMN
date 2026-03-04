@@ -18,8 +18,12 @@ Tools exposed:
 
 import argparse
 import io
+import itertools
 import logging
 import os
+import sys
+import threading
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Optional
@@ -46,6 +50,47 @@ DEFAULT_MAX_RESULTS = 20  # per source
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Spinner Utility for CLI
+# ---------------------------------------------------------------------------
+class Spinner:
+    def __init__(self, message: str = "Loading..."):
+        self.spinner = itertools.cycle(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
+        self.message = message
+        self.running = False
+        self.thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
+
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._spin, daemon=True)
+        self.thread.start()
+
+    def _spin(self):
+        while self.running:
+            with self._lock:
+                msg = self.message
+            sys.stderr.write(f'\r\033[K{next(self.spinner)} {msg}')
+            sys.stderr.flush()
+            time.sleep(0.1)
+
+    def stop(self):
+        self.running = False
+        if self.thread is not None:
+            self.thread.join()
+        sys.stderr.write('\r\033[K')
+        sys.stderr.flush()
+
+    def update(self, message: str):
+        with self._lock:
+            self.message = message
+
+_cli_spinner: Optional[Spinner] = None
+
+def set_spinner_message(msg: str):
+    if _cli_spinner and _cli_spinner.running:
+        _cli_spinner.update(msg)
 
 # ---------------------------------------------------------------------------
 # MCP Server
@@ -107,6 +152,7 @@ def _search_semantic_scholar(
     query: str, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query Semantic Scholar Graph API and return a list of paper dicts."""
+    set_spinner_message("Semantic Scholar: Querying API...")
     headers = {"x-api-key": SEMANTIC_SCHOLAR_API_KEY}
     params = {
         "query": query,
@@ -128,7 +174,9 @@ def _search_semantic_scholar(
         return []
 
     papers: list[dict] = []
-    for item in data.get("data", []):
+    items = data.get("data", [])
+    total = len(items)
+    for i, item in enumerate(items, 1):
         authors = [a.get("name", "") for a in item.get("authors", [])]
         doi = (item.get("externalIds") or {}).get("DOI", "")
 
@@ -137,7 +185,9 @@ def _search_semantic_scholar(
         oa_pdf = item.get("openAccessPdf") or {}
         pdf_url = oa_pdf.get("url", "")
         if pdf_url:
+            title_short = item.get("title", "")[:30]
             logger.info("Downloading open-access PDF for: %s", item.get("title", ""))
+            set_spinner_message(f"Semantic Scholar: PDF {i}/{total} ({title_short}...)")
             full_text = _download_pdf_text(pdf_url)
 
         papers.append(
@@ -206,6 +256,7 @@ def _search_pubmed(
 
     For articles available in PubMed Central, the full text body is fetched.
     """
+    set_spinner_message("PubMed: Querying esearch API...")
     Entrez.email = PUBMED_EMAIL
     Entrez.api_key = PUBMED_API_KEY
 
@@ -224,6 +275,7 @@ def _search_pubmed(
     if not id_list:
         return []
 
+    set_spinner_message(f"PubMed: Fetching {len(id_list)} XML summaries...")
     # Step 2: fetch article details as XML
     try:
         fetch_handle = Entrez.efetch(
@@ -251,7 +303,9 @@ def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
         logger.error("Failed to parse PubMed XML: %s", exc)
         return []
 
-    for article_elem in root.findall(".//PubmedArticle"):
+    articles = root.findall(".//PubmedArticle")
+    total = len(articles)
+    for i, article_elem in enumerate(articles, 1):
         medline = article_elem.find("MedlineCitation")
         if medline is None:
             continue
@@ -318,7 +372,9 @@ def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
         # Fetch full text from PMC if available
         full_text = ""
         if pmcid:
+            title_short = title[:30]
             logger.info("Fetching PMC full text for %s (%s)", title[:60], pmcid)
+            set_spinner_message(f"PubMed: Fetching PMC {i}/{total} ({title_short}...)")
             full_text = _fetch_pmc_full_text(pmcid)
 
         papers.append(
@@ -448,11 +504,13 @@ def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -
         len(pm_papers),
     )
 
+    set_spinner_message("Deduplicating papers...")
     all_papers = ss_papers + pm_papers
     unique_papers = _deduplicate(all_papers)
 
     logger.info("After deduplication: %d unique papers", len(unique_papers))
 
+    set_spinner_message("Formatting results...")
     return _format_results(unique_papers)
 
 
@@ -486,6 +544,7 @@ def search_literature(
 
 def _cli_search(args: argparse.Namespace) -> None:
     """Handle the 'search' subcommand."""
+    global _cli_spinner
     query = args.query
     if not query:
         query = input("Enter your search query: ").strip()
@@ -493,7 +552,15 @@ def _cli_search(args: argparse.Namespace) -> None:
             print("Error: empty query. Exiting.")
             return
 
-    result = _run_search(query, args.max_results)
+    # Suppress logger info so it doesn't mess with the spinner
+    logger.setLevel(logging.WARNING)
+    _cli_spinner = Spinner("Starting search...")
+    _cli_spinner.start()
+    try:
+        result = _run_search(query, args.max_results)
+    finally:
+        _cli_spinner.stop()
+        logger.setLevel(logging.INFO)
 
     # Build output path
     script_dir = os.path.dirname(os.path.abspath(__file__))
