@@ -18,6 +18,7 @@ Tools exposed:
 """
 
 import argparse
+import re
 import io
 import itertools
 import logging
@@ -112,6 +113,161 @@ mcp = FastMCP(
 
 
 # ---------------------------------------------------------------------------
+# Natural Language Query Parser
+# ---------------------------------------------------------------------------
+
+# Keywords that signal an institutional affiliation
+_INST_KEYWORDS_RE = re.compile(
+    r'\b(?:university|universit[àáa]|institute|college|laboratory|'
+    r'center|centre|school|hospital|polytechnic|academy|clinic)\b',
+    re.IGNORECASE,
+)
+# Connector words commonly found inside institution names
+_INST_CONNECTORS = {'of', 'for', 'the', 'and', 'in', 'at', 'de', 'di', 'du', 'des'}
+
+# Context cues that the preceding/following words are an author name
+_AUTHOR_CUES_AFTER = {
+    'publications', 'papers', 'articles', 'work', 'works',
+    'research', 'studies', 'study',
+}
+
+
+def _parse_query(raw_query: str) -> dict:
+    """Parse a natural language query into structured components.
+
+    Detects:
+      * Date ranges  — "2023-2026", "since 2023", "from 2020 to 2024"
+      * Institutions — phrases containing university / institute / …
+      * Author names — capitalised name-like words near contextual cues
+      * Topic        — everything remaining
+
+    Returns a dict with keys: author, institution, year_start, year_end, topic.
+    """
+    current_year = datetime.now().year
+    text = raw_query.strip()
+    parsed: dict = {
+        'author': '',
+        'institution': '',
+        'year_start': None,
+        'year_end': None,
+        'topic': '',
+    }
+
+    # --- 1. Date ranges ---------------------------------------------------
+    date_patterns: list[tuple] = [
+        (r'(?:from\s+)?(\d{4})\s*[-–]\s*(\d{4})',
+         lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r'(?:from\s+)?(\d{4})\s+to\s+(\d{4})',
+         lambda m: (int(m.group(1)), int(m.group(2)))),
+        (r'since\s+(\d{4})',
+         lambda m: (int(m.group(1)), current_year)),
+        (r'after\s+(\d{4})',
+         lambda m: (int(m.group(1)) + 1, current_year)),
+        (r'before\s+(\d{4})',
+         lambda m: (None, int(m.group(1)) - 1)),
+    ]
+    for pat, extractor in date_patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            parsed['year_start'], parsed['year_end'] = extractor(m)
+            text = (text[:m.start()] + ' ' + text[m.end():]).strip()
+            break
+
+    # --- 2. Institution ---------------------------------------------------
+    inst_match = _INST_KEYWORDS_RE.search(text)
+    if inst_match:
+        # Walk backwards from keyword to grab leading capitalised words
+        words_before = text[:inst_match.start()].split()
+        inst_prefix: list[str] = []
+        non_connector_count = 0
+        for w in reversed(words_before):
+            clean = w.strip('.,;:')
+            if not clean:
+                break
+            is_connector = clean.lower() in _INST_CONNECTORS
+            if is_connector:
+                inst_prefix.insert(0, clean)
+            elif clean[0].isupper():
+                # Stop at all-caps short words (likely surnames: HU, LI, WU)
+                if clean.isupper() and len(clean) <= 3 and inst_prefix:
+                    break
+                non_connector_count += 1
+                if non_connector_count > 2:
+                    break
+                inst_prefix.insert(0, clean)
+            else:
+                break
+
+        # Walk forwards from keyword to grab trailing words
+        words_from_kw = text[inst_match.start():].split()
+        inst_suffix: list[str] = []
+        for j, w in enumerate(words_from_kw):
+            clean = w.strip('.,;:')
+            if j == 0:                       # the keyword itself
+                inst_suffix.append(clean)
+            elif clean and (clean[0].isupper() or clean.lower() in _INST_CONNECTORS):
+                inst_suffix.append(clean)
+            else:
+                break
+
+        institution = ' '.join(inst_prefix + inst_suffix)
+        parsed['institution'] = institution
+
+        # Remove the institution span from text
+        full_span = ' '.join(inst_prefix + inst_suffix)
+        # Build a regex that matches the institution words with flexible spacing
+        escaped_words = [re.escape(w.strip('.,;:')) for w in (inst_prefix + inst_suffix)]
+        span_re = re.compile(r'\s*' + r'\s+'.join(escaped_words) + r'\s*', re.IGNORECASE)
+        text = span_re.sub(' ', text, count=1).strip()
+
+    # --- 3. Author name ---------------------------------------------------
+    # Pattern A: "by <Name>"
+    by_match = re.search(
+        r'\bby\s+([A-Z][a-zA-Z]+(?:\s+[A-Za-z]+){0,3})', text
+    )
+    if by_match:
+        parsed['author'] = by_match.group(1).strip()
+        text = (text[:by_match.start()] + ' ' + text[by_match.end():]).strip()
+    else:
+        # Pattern B: "<Name> publications/papers/…"
+        pub_pat = (
+            r'([A-Z][a-zA-Z]+(?:\s+[A-Za-z]+){0,3})'
+            r'\s+(?:' + '|'.join(_AUTHOR_CUES_AFTER) + r')'
+        )
+        pub_match = re.search(pub_pat, text, re.IGNORECASE)
+        if pub_match:
+            parsed['author'] = pub_match.group(1).strip()
+            text = (text[:pub_match.start()] + ' ' + text[pub_match.end():]).strip()
+        elif parsed['institution']:
+            # If there is an institution, remaining capitalised multi‐word is
+            # likely an author name
+            name_match = re.search(
+                r'([A-Z][a-zA-Z]+(?:\s+[A-Za-z]+){1,2})', text
+            )
+            if name_match:
+                candidate = name_match.group(1).strip()
+                # Simple sanity: must be 2–3 words
+                if 2 <= len(candidate.split()) <= 3:
+                    parsed['author'] = candidate
+                    text = (
+                        text[:name_match.start()] + ' ' + text[name_match.end():]
+                    ).strip()
+
+    # --- 4. Remaining text → topic ----------------------------------------
+    noise = {
+        'publications', 'papers', 'articles', 'works', 'research',
+        'studies', 'from', 'by', 'at', 'on', 'about',
+    }
+    topic_words = [
+        w for w in text.split()
+        if w.lower().strip('.,;:') not in noise
+    ]
+    parsed['topic'] = ' '.join(topic_words).strip()
+
+    return parsed
+
+
+# ---------------------------------------------------------------------------
 # PDF text extraction
 # ---------------------------------------------------------------------------
 
@@ -166,16 +322,35 @@ def _download_pdf_text(url: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _search_semantic_scholar(
-    query: str, max_results: int = DEFAULT_MAX_RESULTS
+    parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query Semantic Scholar Graph API and return a list of paper dicts."""
     set_spinner_message("Semantic Scholar: Querying API...")
+
+    # Build search string – Semantic Scholar is keyword-only,
+    # so we combine author + topic into the query string.
+    search_parts: list[str] = []
+    if parsed['author']:
+        search_parts.append(parsed['author'])
+    if parsed['topic']:
+        search_parts.append(parsed['topic'])
+    ss_query = ' '.join(search_parts) if search_parts else ''
+    if not ss_query:
+        return []
+
     headers = {"x-api-key": SEMANTIC_SCHOLAR_API_KEY}
-    params = {
-        "query": query,
+    params: dict = {
+        "query": ss_query,
         "limit": max_results,
         "fields": SEMANTIC_SCHOLAR_FIELDS,
     }
+    # Year range filter
+    if parsed['year_start'] and parsed['year_end']:
+        params["year"] = f"{parsed['year_start']}-{parsed['year_end']}"
+    elif parsed['year_start']:
+        params["year"] = f"{parsed['year_start']}-"
+    elif parsed['year_end']:
+        params["year"] = f"-{parsed['year_end']}"
 
     try:
         resp = requests.get(
@@ -267,7 +442,7 @@ def _parse_pmc_body(xml_data: bytes | str) -> str:
 
 
 def _search_pubmed(
-    query: str, max_results: int = DEFAULT_MAX_RESULTS
+    parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query PubMed via NCBI E-Utilities and return a list of paper dicts.
 
@@ -277,10 +452,27 @@ def _search_pubmed(
     Entrez.email = PUBMED_EMAIL
     Entrez.api_key = PUBMED_API_KEY
 
+    # Build structured PubMed query
+    pm_parts: list[str] = []
+    if parsed['author']:
+        pm_parts.append(f"{parsed['author']}[Author]")
+    if parsed['institution']:
+        pm_parts.append(f"{parsed['institution']}[Affiliation]")
+    if parsed['topic']:
+        pm_parts.append(parsed['topic'])
+    if parsed['year_start'] or parsed['year_end']:
+        ys = parsed['year_start'] or 1900
+        ye = parsed['year_end'] or datetime.now().year
+        pm_parts.append(f"{ys}:{ye}[dp]")
+    pm_query = ' AND '.join(pm_parts) if pm_parts else ''
+    if not pm_query:
+        return []
+    logger.info("PubMed query: %s", pm_query)
+
     # Step 1: search for IDs
     try:
         search_handle = Entrez.esearch(
-            db="pubmed", term=query, retmax=max_results, sort="relevance"
+            db="pubmed", term=pm_query, retmax=max_results, sort="relevance"
         )
         search_results = Entrez.read(search_handle)
         search_handle.close()
@@ -431,12 +623,12 @@ def _reconstruct_abstract(inverted_index: dict) -> str:
 
 
 def _search_openalex(
-    query: str, max_results: int = DEFAULT_MAX_RESULTS
+    parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query the OpenAlex Works API and return a list of paper dicts."""
     set_spinner_message("OpenAlex: Querying API...")
-    params = {
-        "search": query,
+
+    params: dict = {
         "per_page": min(max_results, 200),  # API max is 200
         "api_key": OPENALEX_API_KEY,
         "select": (
@@ -445,6 +637,66 @@ def _search_openalex(
             "open_access,best_oa_location"
         ),
     }
+
+    # Use search for topic keywords
+    if parsed['topic']:
+        params["search"] = parsed['topic']
+
+    # Build filter string for structured fields
+    filters: list[str] = []
+
+    # Author: two-step lookup — resolve name → OpenAlex author ID first
+    if parsed['author']:
+        set_spinner_message("OpenAlex: Resolving author ID...")
+        try:
+            author_resp = requests.get(
+                "https://api.openalex.org/authors",
+                params={"search": parsed['author'], "per_page": 1,
+                        "api_key": OPENALEX_API_KEY},
+                timeout=15,
+            )
+            author_resp.raise_for_status()
+            author_data = author_resp.json()
+            author_results = author_data.get("results", [])
+            if author_results:
+                oa_id = author_results[0]["id"].replace(
+                    "https://openalex.org/", ""
+                )
+                filters.append(f"author.id:{oa_id}")
+                logger.info(
+                    "OpenAlex author resolved: %s → %s",
+                    parsed['author'], oa_id,
+                )
+            else:
+                # Fall back to putting author name in the search param
+                search_parts = [parsed['author']]
+                if parsed['topic']:
+                    search_parts.append(parsed['topic'])
+                params["search"] = ' '.join(search_parts)
+        except requests.RequestException as exc:
+            logger.warning("OpenAlex author lookup failed: %s", exc)
+            # Fall back to keyword search
+            search_parts = [parsed['author']]
+            if parsed['topic']:
+                search_parts.append(parsed['topic'])
+            params["search"] = ' '.join(search_parts)
+
+    if parsed['year_start'] and parsed['year_end']:
+        filters.append(
+            f"publication_year:{parsed['year_start']}-{parsed['year_end']}"
+        )
+    elif parsed['year_start']:
+        filters.append(f"publication_year:{parsed['year_start']}-")
+    elif parsed['year_end']:
+        filters.append(f"publication_year:-{parsed['year_end']}")
+    if filters:
+        params["filter"] = ','.join(filters)
+
+    # Need at least search or filter
+    if "search" not in params and "filter" not in params:
+        return []
+
+    logger.info("OpenAlex params: %s", params)
 
     try:
         resp = requests.get(
@@ -515,16 +767,34 @@ def _search_openalex(
 # ---------------------------------------------------------------------------
 
 def _search_scopus(
-    query: str, max_results: int = DEFAULT_MAX_RESULTS
+    parsed: dict, max_results: int = DEFAULT_MAX_RESULTS
 ) -> list[dict]:
     """Query the Elsevier Scopus Search API and return a list of paper dicts."""
     set_spinner_message("Scopus: Querying API...")
+
+    # Build Scopus structured query
+    sq_parts: list[str] = []
+    if parsed['author']:
+        sq_parts.append(f'AUTH({parsed["author"]})')
+    if parsed['institution'] and not parsed['author']:
+        sq_parts.append(f'AFFIL("{parsed["institution"]}")')
+    if parsed['topic']:
+        sq_parts.append(f'TITLE-ABS-KEY({parsed["topic"]})')
+    if parsed['year_start']:
+        sq_parts.append(f'PUBYEAR > {parsed["year_start"] - 1}')
+    if parsed['year_end']:
+        sq_parts.append(f'PUBYEAR < {parsed["year_end"] + 1}')
+    scopus_query = ' AND '.join(sq_parts) if sq_parts else ''
+    if not scopus_query:
+        return []
+    logger.info("Scopus query: %s", scopus_query)
+
     headers = {
         "X-ELS-APIKey": ELSEVIER_API_KEY,
         "Accept": "application/json",
     }
     params = {
-        "query": query,
+        "query": scopus_query,
         "count": min(max_results, 25),  # Scopus default max per page
         "sort": "relevancy",
         "field": (
@@ -721,14 +991,16 @@ def _format_results(papers: list[dict]) -> str:
 
 def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -> str:
     """Run the literature search pipeline and return formatted markdown."""
+    parsed = _parse_query(query)
     logger.info(
-        "Searching for: %s (max %d per source)", query, max_results_per_source
+        "Searching for: %s (parsed: %s, max %d per source)",
+        query, parsed, max_results_per_source,
     )
 
-    ss_papers = _search_semantic_scholar(query, max_results_per_source)
-    pm_papers = _search_pubmed(query, max_results_per_source)
-    oa_papers = _search_openalex(query, max_results_per_source)
-    sc_papers = _search_scopus(query, max_results_per_source)
+    ss_papers = _search_semantic_scholar(parsed, max_results_per_source)
+    pm_papers = _search_pubmed(parsed, max_results_per_source)
+    oa_papers = _search_openalex(parsed, max_results_per_source)
+    sc_papers = _search_scopus(parsed, max_results_per_source)
 
     logger.info(
         "Found %d from Semantic Scholar, %d from PubMed, "
