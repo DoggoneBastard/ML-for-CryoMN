@@ -3,17 +3,18 @@
 Literature Review MCP Server
 =============================
 An MCP (Model Context Protocol) server that automates literature review by
-searching PubMed and Semantic Scholar for relevant publications given a
-natural language prompt.  Retrieves **full text** whenever possible (via
-PubMed Central XML or open-access PDFs), falling back to abstracts.
+searching PubMed, Semantic Scholar, OpenAlex, and Scopus for relevant
+publications given a natural language prompt.  Retrieves **full text**
+whenever possible (via PubMed Central XML or open-access PDFs), falling
+back to abstracts.
 
 Usage (stdio transport):
     python src/literature_review.py
 
 Tools exposed:
-    - search_literature: Search both PubMed and Semantic Scholar for papers
-      matching a natural language query, deduplicate, and return structured
-      results with full text when available.
+    - search_literature: Search PubMed, Semantic Scholar, OpenAlex, and
+      Scopus for papers matching a natural language query, deduplicate, and
+      return structured results with full text when available.
 """
 
 import argparse
@@ -38,6 +39,8 @@ from mcp.server.fastmcp import FastMCP
 SEMANTIC_SCHOLAR_API_KEY = "ZAkdjJsC8aoWP19Dj1ei50QZ7iOsDzF1iDui3251"
 PUBMED_API_KEY = "6a40f099c7dd4ab902a9915d7993226cd008"
 PUBMED_EMAIL = "lit-review-mcp@example.com"  # Required by NCBI policy
+OPENALEX_API_KEY = "xZaLLUwerMPyNYBcgS0cnz"
+ELSEVIER_API_KEY = "af8ecbeae8e99e8f7539e4d8a0380f18"
 
 SEMANTIC_SCHOLAR_SEARCH_URL = (
     "https://api.semanticscholar.org/graph/v1/paper/search"
@@ -45,6 +48,9 @@ SEMANTIC_SCHOLAR_SEARCH_URL = (
 SEMANTIC_SCHOLAR_FIELDS = (
     "title,authors,year,abstract,url,externalIds,citationCount,openAccessPdf"
 )
+
+OPENALEX_SEARCH_URL = "https://api.openalex.org/works"
+SCOPUS_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
 
 DEFAULT_MAX_RESULTS = 20  # per source
 
@@ -98,8 +104,9 @@ def set_spinner_message(msg: str):
 mcp = FastMCP(
     "Literature Review",
     instructions=(
-        "Search PubMed and Semantic Scholar for relevant publications "
-        "and return structured results with full text when available."
+        "Search PubMed, Semantic Scholar, OpenAlex, and Scopus for "
+        "relevant publications and return structured results with full "
+        "text when available."
     ),
 )
 
@@ -133,10 +140,20 @@ def _extract_text_from_pdf(pdf_bytes: bytes) -> str:
     return "\n".join(text_parts).strip()
 
 
+_PDF_DOWNLOAD_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/pdf,*/*",
+}
+
+
 def _download_pdf_text(url: str) -> str:
     """Download a PDF from *url* and return its extracted text."""
     try:
-        resp = requests.get(url, timeout=60)
+        resp = requests.get(url, headers=_PDF_DOWNLOAD_HEADERS, timeout=60)
         resp.raise_for_status()
     except requests.RequestException as exc:
         logger.warning("PDF download failed (%s): %s", url, exc)
@@ -394,6 +411,219 @@ def _parse_pubmed_xml(xml_data: bytes | str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# OpenAlex helpers
+# ---------------------------------------------------------------------------
+
+def _reconstruct_abstract(inverted_index: dict) -> str:
+    """Reconstruct abstract text from OpenAlex inverted abstract index.
+
+    OpenAlex stores abstracts as {word: [positions]} mappings.  We rebuild
+    the plain-text abstract by placing each word at its recorded position(s).
+    """
+    if not inverted_index:
+        return ""
+    word_positions: list[tuple[int, str]] = []
+    for word, positions in inverted_index.items():
+        for pos in positions:
+            word_positions.append((pos, word))
+    word_positions.sort(key=lambda x: x[0])
+    return " ".join(word for _, word in word_positions)
+
+
+def _search_openalex(
+    query: str, max_results: int = DEFAULT_MAX_RESULTS
+) -> list[dict]:
+    """Query the OpenAlex Works API and return a list of paper dicts."""
+    set_spinner_message("OpenAlex: Querying API...")
+    params = {
+        "search": query,
+        "per_page": min(max_results, 200),  # API max is 200
+        "api_key": OPENALEX_API_KEY,
+        "select": (
+            "id,title,authorships,publication_year,"
+            "abstract_inverted_index,doi,cited_by_count,"
+            "open_access,best_oa_location"
+        ),
+    }
+
+    try:
+        resp = requests.get(
+            OPENALEX_SEARCH_URL, params=params, timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as exc:
+        logger.error("OpenAlex request failed: %s", exc)
+        return []
+
+    papers: list[dict] = []
+    items = data.get("results", [])
+    total = len(items)
+    for i, item in enumerate(items, 1):
+        # Authors
+        authors = []
+        for authorship in item.get("authorships", []):
+            name = (authorship.get("author") or {}).get("display_name", "")
+            if name:
+                authors.append(name)
+
+        # DOI (strip leading https://doi.org/)
+        raw_doi = item.get("doi", "") or ""
+        doi = raw_doi.replace("https://doi.org/", "")
+
+        # Abstract
+        abstract = _reconstruct_abstract(
+            item.get("abstract_inverted_index") or {}
+        )
+
+        # Attempt to get full text from open-access PDF
+        full_text = ""
+        best_oa = item.get("best_oa_location") or {}
+        pdf_url = best_oa.get("pdf_url", "")
+        if pdf_url:
+            title_short = (item.get("title") or "")[:30]
+            logger.info(
+                "Downloading open-access PDF for: %s",
+                item.get("title", ""),
+            )
+            set_spinner_message(
+                f"OpenAlex: PDF {i}/{total} ({title_short}...)"
+            )
+            full_text = _download_pdf_text(pdf_url)
+
+        openalex_id = item.get("id", "")
+        url = openalex_id if openalex_id else ""
+
+        papers.append(
+            {
+                "title": item.get("title", ""),
+                "authors": authors,
+                "year": item.get("publication_year"),
+                "abstract": abstract,
+                "full_text": full_text,
+                "url": url,
+                "doi": doi,
+                "citation_count": item.get("cited_by_count"),
+                "source": "OpenAlex",
+            }
+        )
+    return papers
+
+
+# ---------------------------------------------------------------------------
+# Scopus (Elsevier) helpers
+# ---------------------------------------------------------------------------
+
+def _search_scopus(
+    query: str, max_results: int = DEFAULT_MAX_RESULTS
+) -> list[dict]:
+    """Query the Elsevier Scopus Search API and return a list of paper dicts."""
+    set_spinner_message("Scopus: Querying API...")
+    headers = {
+        "X-ELS-APIKey": ELSEVIER_API_KEY,
+        "Accept": "application/json",
+    }
+    params = {
+        "query": query,
+        "count": min(max_results, 25),  # Scopus default max per page
+        "sort": "relevancy",
+        "field": (
+            "dc:title,dc:creator,author,prism:coverDate,"
+            "prism:doi,citedby-count,dc:description,"
+            "prism:url,prism:publicationName,dc:identifier"
+        ),
+    }
+
+    try:
+        resp = requests.get(
+            SCOPUS_SEARCH_URL, headers=headers, params=params, timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.RequestException as exc:
+        logger.error("Scopus request failed: %s", exc)
+        return []
+
+    search_results = data.get("search-results", {})
+    entries = search_results.get("entry", [])
+
+    # Scopus returns an error entry when no results are found
+    if len(entries) == 1 and "error" in entries[0]:
+        logger.info("Scopus returned no results for query.")
+        return []
+
+    papers: list[dict] = []
+    total = len(entries)
+    for i, entry in enumerate(entries, 1):
+        title = entry.get("dc:title", "")
+
+        # Authors – try 'author' list first, fall back to dc:creator
+        authors: list[str] = []
+        author_list = entry.get("author", [])
+        if isinstance(author_list, list):
+            for a in author_list:
+                name = a.get("authname", "") or a.get("given-name", "")
+                if name:
+                    authors.append(name)
+        if not authors:
+            creator = entry.get("dc:creator", "")
+            if creator:
+                authors.append(creator)
+
+        # Year from prism:coverDate (YYYY-MM-DD)
+        cover_date = entry.get("prism:coverDate", "")
+        year: Optional[int] = None
+        if cover_date and len(cover_date) >= 4:
+            try:
+                year = int(cover_date[:4])
+            except ValueError:
+                pass
+
+        doi = entry.get("prism:doi", "")
+
+        # Abstract / description
+        abstract = entry.get("dc:description", "") or ""
+
+        # Citation count
+        cite_count: Optional[int] = None
+        raw_cite = entry.get("citedby-count", None)
+        if raw_cite is not None:
+            try:
+                cite_count = int(raw_cite)
+            except (ValueError, TypeError):
+                pass
+
+        # URL – Scopus abstract link
+        url = ""
+        links = entry.get("link", [])
+        if isinstance(links, list):
+            for link in links:
+                if link.get("@ref") == "scopus":
+                    url = link.get("@href", "")
+                    break
+        if not url:
+            url = entry.get("prism:url", "")
+
+        title_short = title[:30]
+        set_spinner_message(f"Scopus: Processing {i}/{total} ({title_short}...)")
+
+        papers.append(
+            {
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "abstract": abstract,
+                "full_text": "",  # Scopus doesn't provide full text via search
+                "url": url,
+                "doi": doi,
+                "citation_count": cite_count,
+                "source": "Scopus",
+            }
+        )
+    return papers
+
+
+# ---------------------------------------------------------------------------
 # Deduplication & formatting
 # ---------------------------------------------------------------------------
 
@@ -497,15 +727,20 @@ def _run_search(query: str, max_results_per_source: int = DEFAULT_MAX_RESULTS) -
 
     ss_papers = _search_semantic_scholar(query, max_results_per_source)
     pm_papers = _search_pubmed(query, max_results_per_source)
+    oa_papers = _search_openalex(query, max_results_per_source)
+    sc_papers = _search_scopus(query, max_results_per_source)
 
     logger.info(
-        "Found %d from Semantic Scholar, %d from PubMed",
+        "Found %d from Semantic Scholar, %d from PubMed, "
+        "%d from OpenAlex, %d from Scopus",
         len(ss_papers),
         len(pm_papers),
+        len(oa_papers),
+        len(sc_papers),
     )
 
     set_spinner_message("Deduplicating papers...")
-    all_papers = ss_papers + pm_papers
+    all_papers = ss_papers + pm_papers + oa_papers + sc_papers
     unique_papers = _deduplicate(all_papers)
 
     logger.info("After deduplication: %d unique papers", len(unique_papers))
@@ -523,17 +758,17 @@ def search_literature(
     query: str,
     max_results_per_source: int = DEFAULT_MAX_RESULTS,
 ) -> str:
-    """Search PubMed and Semantic Scholar for papers matching a natural
-    language query.  Returns a deduplicated, formatted list of publications
-    with title, authors, year, citation count, URL, and **full text** when
-    available (via PubMed Central or open-access PDFs), falling back to
-    abstracts.
+    """Search PubMed, Semantic Scholar, OpenAlex, and Scopus for papers
+    matching a natural language query.  Returns a deduplicated, formatted
+    list of publications with title, authors, year, citation count, URL,
+    and **full text** when available (via PubMed Central or open-access
+    PDFs), falling back to abstracts.
 
     Args:
         query: Natural language search query describing the topic of interest
                (e.g. "machine learning for cryo-electron microscopy").
         max_results_per_source: Maximum number of results to fetch from each
-                                source (default 20).
+                                 source (default 20).
     """
     return _run_search(query, max_results_per_source)
 
@@ -588,7 +823,7 @@ def _cli_serve(_args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Literature Review – search PubMed & Semantic Scholar"
+        description="Literature Review – search PubMed, Semantic Scholar, OpenAlex & Scopus"
     )
     subparsers = parser.add_subparsers(dest="command")
 
