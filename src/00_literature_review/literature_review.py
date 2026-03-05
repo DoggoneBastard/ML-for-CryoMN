@@ -32,6 +32,7 @@ from datetime import datetime
 from typing import Optional
 
 import aiohttp
+from curl_cffi.requests import AsyncSession
 from Bio import Entrez
 from mcp.server.fastmcp import FastMCP
 
@@ -312,11 +313,13 @@ _PDF_DOWNLOAD_HEADERS = {
 async def _download_pdf_text(session: aiohttp.ClientSession, url: str) -> str:
     """Download a PDF from *url* and return its extracted text."""
     try:
-        async with session.get(
-            url, headers=_PDF_DOWNLOAD_HEADERS, timeout=aiohttp.ClientTimeout(total=PDF_TIMEOUT)
-        ) as resp:
+        # Using curl_cffi to bypass Akamai/Cloudflare WAF protecting some journals (e.g. MDPI)
+        async with AsyncSession(impersonate="chrome120") as s:
+            resp = await s.get(
+                url, headers=_PDF_DOWNLOAD_HEADERS, timeout=PDF_TIMEOUT
+            )
             resp.raise_for_status()
-            pdf_bytes = await resp.read()
+            pdf_bytes = resp.content
     except Exception as exc:
         logger.warning("PDF download failed (%s): %s", url, exc)
         return ""
@@ -943,6 +946,8 @@ async def _search_scopus(
 
 def _normalize(text: str) -> str:
     """Lowercase, strip whitespace and punctuation for comparison."""
+    if not text:
+        return ""
     return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
@@ -954,10 +959,12 @@ def _deduplicate(papers: list[dict]) -> list[dict]:
 
     def _richness(p: dict) -> int:
         """Score how much content a paper entry contains."""
-        return len(p.get("full_text", "")) + len(p.get("abstract", ""))
+        ft = p.get("full_text") or ""
+        ab = p.get("abstract") or ""
+        return len(ft) + len(ab)
 
     for paper in papers:
-        norm_title = _normalize(paper.get("title", ""))
+        norm_title = _normalize(paper.get("title") or "")
         doi = (paper.get("doi") or "").strip().lower()
 
         # Check if already seen by DOI
