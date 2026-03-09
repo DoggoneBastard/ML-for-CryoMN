@@ -25,7 +25,6 @@ import numpy as np
 import os
 import json
 import pickle
-import shutil
 import sys
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
@@ -34,6 +33,15 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
+
+from iteration_metadata import (
+    PRIOR_MEAN_METHOD,
+    activate_iteration_artifacts,
+    append_iteration_history,
+    derive_iteration_dir,
+    load_iteration_history,
+    stamp_model_metadata,
+)
 
 
 # =============================================================================
@@ -322,8 +330,11 @@ def update_model_with_prior_mean(
     validation_data: Tuple[np.ndarray, np.ndarray],
     original_data: Tuple[np.ndarray, np.ndarray], 
     output_dir: str,
+    iteration: int,
+    iteration_dir_name: str,
     alpha_literature: float = ALPHA_LITERATURE,
-    alpha_wetlab: float = ALPHA_WETLAB
+    alpha_wetlab: float = ALPHA_WETLAB,
+    model_method: str = PRIOR_MEAN_METHOD,
 ) -> Dict:
     """
     Update model using literature as prior mean + wet lab correction.
@@ -428,7 +439,13 @@ def update_model_with_prior_mean(
     metadata['alpha_literature'] = alpha_literature
     metadata['alpha_wetlab'] = alpha_wetlab
     metadata['noise_ratio'] = alpha_literature / alpha_wetlab
-    metadata['is_composite_model'] = True
+    metadata = stamp_model_metadata(
+        metadata,
+        iteration=iteration,
+        model_method=model_method,
+        iteration_dir=iteration_dir_name,
+        is_composite_model=True,
+    )
     
     save_composite_model(composite_model, output_dir, metadata)
     
@@ -450,33 +467,12 @@ def update_model_with_prior_mean(
 
 def get_iteration_number(project_dir: str) -> int:
     """Get current iteration number from history."""
-    history_path = os.path.join(project_dir, 'data', 'validation', 'iteration_history.json')
-    
-    if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
-        return len(history.get('iterations', []))
-    return 0
+    return len(load_iteration_history(project_dir))
 
 
 def save_iteration(project_dir: str, iteration_data: Dict):
     """Save iteration information to history."""
-    history_path = os.path.join(project_dir, 'data', 'validation', 'iteration_history.json')
-    
-    if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
-    else:
-        history = {'iterations': []}
-    
-    iteration_data['timestamp'] = datetime.now().isoformat()
-    history['iterations'].append(iteration_data)
-    
-    os.makedirs(os.path.dirname(history_path), exist_ok=True)
-    with open(history_path, 'w') as f:
-        json.dump(history, f, indent=2)
-    
-    print(f"Iteration {len(history['iterations'])} logged")
+    append_iteration_history(project_dir, iteration_data)
 
 
 # =============================================================================
@@ -599,26 +595,34 @@ def main():
     print(f"\n--- Iteration {iteration} (Prior Mean + Correction) ---")
     
     # Update model with prior mean approach
-    updated_model_dir = os.path.join(model_dir, f'iteration_{iteration}_prior_mean')
+    model_method = PRIOR_MEAN_METHOD
+    iteration_dir_name = derive_iteration_dir(iteration, model_method)
+    updated_model_dir = os.path.join(model_dir, iteration_dir_name)
     stats = update_model_with_prior_mean(
         model_dir,
         (X_val, y_val),
         (X_orig, y_orig),
         updated_model_dir,
+        iteration=iteration,
+        iteration_dir_name=iteration_dir_name,
         alpha_literature=ALPHA_LITERATURE,
-        alpha_wetlab=ALPHA_WETLAB
+        alpha_wetlab=ALPHA_WETLAB,
+        model_method=model_method,
     )
     
     # Update main model directory
     # Note: We copy the composite model but also keep backward-compatible files
     print("\nUpdating main model directory...")
-    for filename in ['gp_model.pkl', 'scaler.pkl', 'model_metadata.json', 
-                     'composite_model.pkl', 'gp_literature.pkl', 'scaler_literature.pkl',
-                     'gp_correction.pkl', 'scaler_correction.pkl']:
-        src = os.path.join(updated_model_dir, filename)
-        dst = os.path.join(model_dir, filename)
-        if os.path.exists(src):
-            shutil.copy(src, dst)
+    activate_iteration_artifacts(
+        updated_model_dir,
+        model_dir,
+        ['gp_model.pkl', 'scaler.pkl', 'model_metadata.json',
+         'composite_model.pkl', 'gp_literature.pkl', 'scaler_literature.pkl',
+         'gp_correction.pkl', 'scaler_correction.pkl'],
+        iteration=iteration,
+        model_method=model_method,
+        reason='activating a newly trained iteration',
+    )
     
     # Save evaluation data for explainability
     save_evaluation_data(
@@ -631,7 +635,10 @@ def main():
     # Save iteration history
     save_iteration(project_root, {
         'iteration': iteration,
-        'method': 'prior_mean_correction',
+        'method': model_method,
+        'model_method': model_method,
+        'iteration_dir': iteration_dir_name,
+        'is_composite_model': True,
         'n_validation_samples': stats['n_validation'],
         'validation_rmse': stats['validation_rmse'],
         'literature_rmse': stats['literature_rmse'],

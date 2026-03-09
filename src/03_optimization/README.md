@@ -15,12 +15,15 @@ python src/03_optimization/optimize_formulation.py
 
 ## Input
 
-- **Model**: `models/composite_model.pkl` (preferred) or `models/gp_model.pkl` (fallback)
+- **Model registry**: `models/model_metadata.json` + `data/validation/iteration_history.json`
+- **Iteration artifacts**: `models/iteration_*`
 - **Data**: `data/processed/parsed_formulations.csv`
 
-The script reads `models/model_metadata.json` to decide whether the active model is composite or standard, then prints its selection:
-- `>>> Using COMPOSITE model (literature prior + wet lab correction)` — if `composite_model.pkl` is found. This model is specifically created by running `04_validation_loop/update_model_weighted_prior.py`.
-- `>>> Using STANDARD GP model (literature-only)` — if metadata marks the active model as standard. Stale composite artifacts are ignored automatically.
+The script now validates the active model against both root metadata and the recorded iteration history:
+- If the latest recorded iteration and `models/model_metadata.json` agree, `03` loads that iteration's artifacts directly.
+- If metadata is missing, malformed, or points at the wrong iteration, `03` prompts for an iteration number.
+- If you choose a valid iteration during conflict recovery, `03` overwrites `models/model_metadata.json` to repair the conflict and explicitly notifies you before and after doing so.
+- If metadata says the model is composite but the composite artifacts are missing, the script stops. It does **not** fall back to the standard GP automatically.
 
 ## Output
 
@@ -30,12 +33,13 @@ The script reads `models/model_metadata.json` to decide whether the active model
 
 ## Algorithm
 
-1. Load the active model selected by `models/model_metadata.json`
-2. Generate large pool of random formulations (50× target count)
-3. Filter by constraints (max DMSO, max ingredients)
-4. Use model to predict viability for each candidate
-5. Rank by predicted viability (highest mean)
-6. Select top-N candidates
+1. Validate the active iteration using `models/model_metadata.json`, `iteration_history.json`, and `models/iteration_*`
+2. Load the exact artifacts for the selected iteration
+3. Generate large pool of random formulations (50× target count)
+4. Filter by constraints (max DMSO, max ingredients)
+5. Use model to predict viability for each candidate
+6. Rank by predicted viability (highest mean)
+7. Select top-N candidates
 
 ### Constraints
 

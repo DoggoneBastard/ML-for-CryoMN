@@ -120,11 +120,21 @@ ALPHA_WETLAB = 0.02      # Lower noise = more trusted  (50x trust ratio)
 
 ## Model Selection Behavior
 
-Downstream scripts (`03_optimization`, `05_bo_optimization`, `06_explainability`) now follow `models/model_metadata.json` when deciding whether the active model is composite or standard. That means:
+Each update script now stamps the trained iteration with explicit identity fields:
+- `iteration`
+- `iteration_dir`
+- `model_method`
+- `is_composite_model`
+
+The same identity is also appended to `data/validation/iteration_history.json`.
+
+Downstream scripts (`03_optimization`, `05_bo_optimization`, `06_explainability`) follow `models/model_metadata.json` when deciding whether the active model is composite or standard. That means:
 
 - `update_model.py` and `update_model_weighted_simple.py` mark the active model as **standard GP**
 - `update_model_weighted_prior.py` marks the active model as **composite GP**
-- stale `composite_model.pkl` files are ignored automatically when metadata says the active model is standard
+- a composite-marked iteration must have composite artifacts; downstream loaders should not fall back automatically to the standard GP
+
+Whenever an update script activates a newly trained iteration by replacing `models/model_metadata.json`, it prints a notice that the active metadata is being overwritten and identifies the target iteration/method.
 
 ## Output
 
@@ -139,6 +149,8 @@ The evaluation data CSV includes a `weight` column (1.0 for literature, 50.0 for
 
 Each iteration is logged with:
 - Timestamp
+- Iteration number and iteration directory
+- Model method and whether the model is composite
 - Number of validation samples
 - Wet-lab cross-validated RMSE (`validation_rmse`)
 - Wet-lab in-sample RMSE (`wetlab_train_rmse` in model metadata)

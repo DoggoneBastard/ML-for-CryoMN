@@ -14,7 +14,6 @@ import numpy as np
 import os
 import json
 import pickle
-import shutil
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
@@ -22,6 +21,15 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
+
+from iteration_metadata import (
+    STANDARD_METHOD,
+    activate_iteration_artifacts,
+    append_iteration_history,
+    derive_iteration_dir,
+    load_iteration_history,
+    stamp_model_metadata,
+)
 
 
 # =============================================================================
@@ -133,8 +141,15 @@ def compute_wetlab_cv_rmse(
 
     return float(np.sqrt(np.mean((y_val - y_pred) ** 2)))
 
-def update_model(original_model_dir: str, validation_data: Tuple[np.ndarray, np.ndarray],
-                 original_data: Tuple[np.ndarray, np.ndarray], output_dir: str) -> Dict:
+def update_model(
+    original_model_dir: str,
+    validation_data: Tuple[np.ndarray, np.ndarray],
+    original_data: Tuple[np.ndarray, np.ndarray],
+    output_dir: str,
+    iteration: int,
+    iteration_dir_name: str,
+    model_method: str = STANDARD_METHOD,
+) -> Dict:
     """
     Update GP model with new validation data.
     
@@ -192,7 +207,13 @@ def update_model(original_model_dir: str, validation_data: Tuple[np.ndarray, np.
     metadata['n_total_samples'] = len(X_combined)
     metadata['validation_rmse'] = val_rmse
     metadata['wetlab_train_rmse'] = train_rmse
-    metadata['is_composite_model'] = False
+    metadata = stamp_model_metadata(
+        metadata,
+        iteration=iteration,
+        model_method=model_method,
+        iteration_dir=iteration_dir_name,
+        is_composite_model=False,
+    )
     
     with open(os.path.join(output_dir, 'model_metadata.json'), 'w') as f:
         json.dump(metadata, f, indent=2)
@@ -214,33 +235,12 @@ def update_model(original_model_dir: str, validation_data: Tuple[np.ndarray, np.
 
 def get_iteration_number(project_dir: str) -> int:
     """Get current iteration number from history."""
-    history_path = os.path.join(project_dir, 'data', 'validation', 'iteration_history.json')
-    
-    if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
-        return len(history.get('iterations', []))
-    return 0
+    return len(load_iteration_history(project_dir))
 
 
 def save_iteration(project_dir: str, iteration_data: Dict):
     """Save iteration information to history."""
-    history_path = os.path.join(project_dir, 'data', 'validation', 'iteration_history.json')
-    
-    if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
-    else:
-        history = {'iterations': []}
-    
-    iteration_data['timestamp'] = datetime.now().isoformat()
-    history['iterations'].append(iteration_data)
-    
-    os.makedirs(os.path.dirname(history_path), exist_ok=True)
-    with open(history_path, 'w') as f:
-        json.dump(history, f, indent=2)
-    
-    print(f"Iteration {len(history['iterations'])} logged")
+    append_iteration_history(project_dir, iteration_data)
 
 
 # =============================================================================
@@ -313,24 +313,37 @@ def main():
     print(f"\n--- Iteration {iteration} ---")
     
     # Update model
-    updated_model_dir = os.path.join(model_dir, f'iteration_{iteration}')
+    model_method = STANDARD_METHOD
+    iteration_dir_name = derive_iteration_dir(iteration, model_method)
+    updated_model_dir = os.path.join(model_dir, iteration_dir_name)
     stats = update_model(
         model_dir,
         (X_val, y_val),
         (X_orig, y_orig),
-        updated_model_dir
+        updated_model_dir,
+        iteration=iteration,
+        iteration_dir_name=iteration_dir_name,
+        model_method=model_method,
     )
     
     # Also update main model directory
     print("\nUpdating main model...")
-    for filename in ['gp_model.pkl', 'scaler.pkl', 'model_metadata.json']:
-        src = os.path.join(updated_model_dir, filename)
-        dst = os.path.join(model_dir, filename)
-        shutil.copy(src, dst)
+    activate_iteration_artifacts(
+        updated_model_dir,
+        model_dir,
+        ['gp_model.pkl', 'scaler.pkl', 'model_metadata.json'],
+        iteration=iteration,
+        model_method=model_method,
+        reason='activating a newly trained iteration',
+    )
     
     # Save iteration history
     save_iteration(project_root, {
         'iteration': iteration,
+        'method': model_method,
+        'model_method': model_method,
+        'iteration_dir': iteration_dir_name,
+        'is_composite_model': False,
         'n_validation_samples': stats['n_validation'],
         'validation_rmse': stats['validation_rmse'],
     })
