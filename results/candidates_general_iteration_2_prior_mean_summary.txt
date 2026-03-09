@@ -1,0 +1,105 @@
+================================================================================
+CryoMN Optimized Formulation Candidates
+Generated: 2026-03-09 23:50
+================================================================================
+
+Rank 1: 1.21M glycerol + 8.3% hsa
+  Predicted viability: 58.2% ± 11.2%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 2: 1.03M ethylene_glycol + 36.1mM proline
+  Predicted viability: 55.7% ± 11.9%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 3: 36.8% fbs + 1.86M glycerol
+  Predicted viability: 52.0% ± 12.6%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 4: 1.3% hsa + 346.5mM sucrose
+  Predicted viability: 49.9% ± 13.6%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 5: 30.1mM betaine + 1.83M glycerol + 4.7% hsa
+  Predicted viability: 41.5% ± 18.7%
+  DMSO: 0.0%
+  Ingredients: 3
+
+Rank 6: 320.9mM betaine + 188.0mM ethylene_glycol + 396.8mM propylene_glycol + 176.0mM raffinose + 412.3mM sucrose
+  Predicted viability: 40.0% ± 20.4%
+  DMSO: 0.0%
+  Ingredients: 5
+
+Rank 7: 0.5% hes + 86.5% human_serum
+  Predicted viability: 37.8% ± 24.3%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 8: 1.54M creatine + 9.3% hsa
+  Predicted viability: 34.6% ± 24.6%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 9: 4.3% hes + 78.3% human_serum
+  Predicted viability: 34.5% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 10: 2.5% dextran + 738.7mM glycerol + 58.2mM proline
+  Predicted viability: 34.4% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 3
+
+Rank 11: 5.8% pvp + 353.4mM raffinose
+  Predicted viability: 33.9% ± 24.6%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 12: 491.7mM ectoin + 505.2mM propylene_glycol
+  Predicted viability: 33.8% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 13: 2.33M glycerol + 152.9mM proline + 182.1mM propylene_glycol
+  Predicted viability: 33.7% ± 24.5%
+  DMSO: 0.0%
+  Ingredients: 3
+
+Rank 14: 493.5mM ectoin + 750.5mM propylene_glycol
+  Predicted viability: 33.7% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 15: 1.53M ethylene_glycol + 33.9% fbs + 1.8% hsa + 3.6% peg_3350 + 149.5mM proline + 7.2% pvp
+  Predicted viability: 33.5% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 6
+
+Rank 16: 2.46M propylene_glycol + 399.1mM sucrose
+  Predicted viability: 33.4% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 17: 8.7% hsa + 2.4% methylcellulose
+  Predicted viability: 33.4% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 18: 60.9% human_serum + 159.4mM proline
+  Predicted viability: 33.3% ± 24.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
+Rank 19: 522.8mM dmso + 2.6% hsa + 6.6% peg_3350 + 1.02M propylene_glycol
+  Predicted viability: 33.3% ± 24.7%
+  DMSO: 3.7%
+  Ingredients: 4
+
+Rank 20: 629.2mM ethylene_glycol + 429.5mM raffinose
+  Predicted viability: 33.3% ± 23.7%
+  DMSO: 0.0%
+  Ingredients: 2
+
