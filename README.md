@@ -38,7 +38,7 @@ python src/01_data_parsing/parse_formulations.py
 python src/02_model_training/train_gp_model.py
 
 # 3. Generate candidates (choose one)
-python src/03_optimization/optimize_formulation.py      # Fast random sampling
+python src/03_optimization/optimize_formulation.py      # Fast random sampling, iteration-aware
 python src/05_bo_optimization/bo_optimizer.py          # Proper BO with DE
 
 # 4. Integrate wet lab results (after experiments)
@@ -47,6 +47,13 @@ python src/04_validation_loop/update_model_weighted_prior.py
 # 5. Explain model predictions (auto-detects composite model)
 python src/06_explainability/explainability.py
 ```
+
+## Active Model and Iterations
+
+- `src/04_validation_loop/*` saves each retrained checkpoint under `models/iteration_*`, updates `data/validation/iteration_history.json`, and then replaces the active root metadata in `models/model_metadata.json` with an explicit overwrite notice.
+- `src/03_optimization/optimize_formulation.py` is now iteration-aware: it validates the root metadata against iteration history and the saved iteration directories before loading a model.
+- If root metadata is missing or inconsistent, `03` prompts for an iteration number, rejects nonsensical choices, and repairs `models/model_metadata.json` only after telling you it is overwriting the metadata.
+- Composite iterations are strict: if metadata says composite, `03` will not fall back to a standard GP automatically.
 
 ## Results
 
@@ -105,7 +112,7 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 │   ├── raw/                    # Original literature data
 │   ├── processed/              # Parsed formulations + evaluation data (with weights)
 │   └── validation/             # Wet lab results template
-├── models/                     # GP model, composite model, scalers
+├── models/                     # Active model mirror + per-iteration checkpoints
 ├── results/                    # Optimized candidates + explainability graphs
 └── src/
     ├── 01_data_parsing/        # Parse CSV, normalize units, merge synonyms
@@ -122,8 +129,8 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 |--------|--------|----------|
 | `01_data_parsing` | Data Parsing & Normalization | Preparing clean, structured training data from raw literature |
 | `02_model_training` | Gaussian Process Regression (Matérn Kernel) | Learning the viability landscape from limited data |
-| `03_optimization` | Random sampling, ranks by highest predicted mean | Quick generation, when speed matters |
-| `04_validation_loop` | Prior mean + correction (50× wet lab trust) | Closing the active learning loop with wet lab feedback |
+| `03_optimization` | Random sampling, iteration-aware model loading | Quick generation, metadata repair when active model state is inconsistent |
+| `04_validation_loop` | Three update strategies + iteration checkpointing | Closing the active learning loop with wet lab feedback |
 | `05_bo_optimization` | Differential Evolution, maximizes UCB by default | Most informative experiments, exploration-exploitation balance |
 | `06_explainability` | SHAP, PDPs, Interaction Contours | Understanding model drivers and ensuring trust |
 
@@ -136,5 +143,6 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 - **Unit normalization** (concentrations converted to molar or kept as percentage)
 - **Uncertainty quantification** (GP provides confidence intervals)
 - **Iterative refinement** (model improves with each wet lab validation)
+- **Iteration-aware recovery** (`03` can repair missing/conflicting active metadata interactively)
 - **Explainable AI** (SHAP and partial dependence plots to interpret Black Box GP)
 - **Two optimization modes**: Fast random sampling OR proper Bayesian optimization

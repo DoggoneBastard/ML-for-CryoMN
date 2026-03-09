@@ -20,6 +20,8 @@ The script reads `models/model_metadata.json` to decide whether the active model
 - `>>> Using COMPOSITE model (literature prior + wet lab correction)` — if `composite_model.pkl` is found. This model is specifically created by running `04_validation_loop/update_model_weighted_prior.py`.
 - `>>> Using STANDARD GP model (literature-only)` — if metadata marks the active model as standard. Stale composite artifacts are ignored automatically.
 
+> **Note**: Unlike `03_optimization`, this script still trusts the active root metadata directly. It does not yet perform the newer iteration-history conflict recovery flow.
+
 ## Output
 
 - `results/bo_candidates_general.csv` - Candidates with ≤5% DMSO
