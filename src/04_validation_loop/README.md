@@ -11,6 +11,7 @@ This module integrates wet lab validation results to iteratively refine the GP m
 | `update_model.py` | Simple concatenation | Baseline (no weighting) |
 | `update_model_weighted_simple.py` | Sample duplication (10x) | Quick experiments, first iterations |
 | `update_model_weighted_prior.py` | Prior mean + correction | When literature has systematic bias |
+| `evaluate_iterations.py` | Stage-based batch scoring | Measuring whether frozen model outputs and candidate ranks improved over the actual wet-lab sequence |
 
 ## Workflow
 
@@ -80,6 +81,34 @@ The script:
 - checks both standard and BO candidate CSVs for that iteration
 - writes filtered outputs to `Untested/Iteration X/` as `*_untested.csv` and `*_untested_summary.txt`
 - matches formulations using the same rounded text precision shown in the candidate summaries
+
+### Evaluate Model Stages Against Wet-Lab Batches
+
+To score the frozen literature-only and iteration-specific outputs against the
+wet-lab batches they actually produced:
+
+```bash
+python src/04_validation_loop/evaluate_iterations.py
+```
+
+The evaluator uses the project's current experiment sequence:
+
+- result files without an iteration suffix map to the literature-only stage and are scored on `EXP101` to `EXP306`
+- when present, the evaluator loads that baseline from `models/literature_only/` instead of borrowing the literature component from iteration 1
+- `iteration_1_*` outputs are scored on `EXP1101` to `EXP1206`
+- `iteration_2_*` outputs are scored on `EXP2101` to `EXP2106`
+- `iteration_3_*` outputs remain pending until those validation rows are added
+
+Outputs:
+
+- `results/evaluation/iteration_prospective_summary.json`
+- `results/evaluation/iteration_prospective_metrics.csv`
+- `results/evaluation/stage_performance.png`
+
+The evaluator reports two kinds of evidence:
+
+- batch-level predictive metrics: RMSE, MAE, Spearman, Kendall, uncertainty coverage, and threshold hit rates
+- candidate rank cross-reference: which validation rows exactly match frozen candidate lists, including their original rank at selection time
 
 ### ⚠️ Before Running Any Update Script
 
@@ -175,3 +204,21 @@ Each iteration is logged with:
 - Wet-lab cross-validated RMSE (`validation_rmse`)
 - Wet-lab in-sample RMSE (`wetlab_train_rmse` in model metadata)
 - Weighting method and parameters
+
+## Current Evaluation Snapshot
+
+Latest outputs in `results/evaluation/` show:
+
+| Stage | Rows | RMSE | Spearman | Hit Rate @ 50% |
+|------|------|------|----------|----------------|
+| Literature only | 18 | 41.21 | -0.327 | 0.444 |
+| Iteration 1 | 11 | 21.67 | -0.518 | 0.909 |
+| Iteration 2 | 6 | 14.74 | 0.086 | 0.667 |
+| Iteration 3 | 0 | N/A | N/A | N/A |
+
+This means the model is getting better in absolute error, but rank ordering of
+the best formulations is still unstable. The clearest proof of iteration 3
+improvement will come from validating and logging more frozen top-ranked
+iteration 3 candidates.
+
+![Stage Performance](../../results/evaluation/stage_performance.png)

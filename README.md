@@ -51,6 +51,9 @@ python src/06_explainability/explainability.py
 
 # 6. Filter out already tested candidates
 python filter_tested_candidates.py
+
+# 7. Evaluate frozen stages against their wet-lab batches
+python src/04_validation_loop/evaluate_iterations.py
 ```
 
 ## Repository Snapshot
@@ -115,6 +118,45 @@ The filtered outputs are written to `Untested/Iteration X/`, where `X` is the it
 
 See `results/` for full candidate lists.
 
+### Stage-Based Evaluation
+
+The repository now includes a stage-based evaluator that scores each frozen
+model output against the wet-lab batch it actually generated:
+
+- standalone literature-only checkpoint in `models/literature_only/` plus outputs in `results/*` without an iteration suffix → `EXP101` to `EXP306`
+- `iteration_1_*` outputs → `EXP1101` to `EXP1206`
+- `iteration_2_*` outputs → `EXP2101` to `EXP2106`
+- `iteration_3_*` outputs → pending current validation work
+
+Run:
+
+```bash
+python src/04_validation_loop/evaluate_iterations.py
+```
+
+Outputs:
+
+- `results/evaluation/iteration_prospective_summary.json`
+- `results/evaluation/iteration_prospective_metrics.csv`
+- `results/evaluation/stage_performance.png`
+
+Current stage-level metrics from the saved evaluation artifacts:
+
+| Stage | Validation batch | Rows | RMSE | Spearman | Hit Rate @ 50% |
+|------|-------------------|------|------|----------|----------------|
+| Literature only | `EXP101-EXP306` | 18 | 41.21 | -0.327 | 0.444 |
+| Iteration 1 | `EXP1101-EXP1206` | 11 | 21.67 | -0.518 | 0.909 |
+| Iteration 2 | `EXP2101-EXP2106` | 6 | 14.74 | 0.086 | 0.667 |
+| Iteration 3 | current validation batch | 0 | N/A | N/A | N/A |
+
+Interpretation:
+
+- absolute error improved substantially from literature-only to iteration 2
+- rank ordering is still weak, especially for literature-only and iteration 1
+- the strongest direct proof for future improvement will come from testing and logging more frozen top-ranked iteration 3 candidates
+
+![Stage Performance](results/evaluation/stage_performance.png)
+
 ---
 
 ## Model Explainability
@@ -161,7 +203,7 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 │   ├── processed/              # Parsed formulations + legacy prior-mean evaluation mirror
 │   └── validation/             # Wet lab results template
 ├── models/                     # Active model mirror + per-iteration checkpoints + observed context
-├── results/                    # Optimized candidates + explainability graphs
+├── results/                    # Optimized candidates + explainability + evaluation graphs
 └── src/
     ├── 01_data_parsing/        # Parse CSV, normalize units, merge synonyms
     ├── 02_model_training/      # Train GP regression model (Matérn kernel)
@@ -178,7 +220,7 @@ For detailed interpretation and additional visualizations, see [`src/06_explaina
 | `01_data_parsing` | Data Parsing & Normalization | Preparing clean, structured training data from raw literature |
 | `02_model_training` | Gaussian Process Regression (Matérn Kernel) | Learning the viability landscape from limited data |
 | `03_optimization` | Random sampling, iteration-aware model loading | Quick generation, metadata repair when active model state is inconsistent |
-| `04_validation_loop` | Three update strategies + iteration checkpointing | Closing the active learning loop with wet lab feedback |
+| `04_validation_loop` | Three update strategies + iteration checkpointing + stage-based evaluation | Closing the active learning loop with wet lab feedback and scoring frozen candidate batches |
 | `05_bo_optimization` | Differential Evolution, wet-lab-aware BO context, shared iteration-aware model loading | Exploiting validated winners while proposing nearby informative variants |
 | `06_explainability` | SHAP, PDPs, Interaction Contours, shared iteration-aware model loading | Understanding model drivers and ensuring trust |
 
