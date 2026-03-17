@@ -236,7 +236,7 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 | `02_model_training` | Gaussian Process Regression (Matérn Kernel) | Learning the viability landscape from limited data |
 | `03_optimization` | Random sampling, iteration-aware model loading | Quick generation, metadata repair when active model state is inconsistent |
 | `04_validation_loop` | Three update strategies + iteration checkpointing | Closing the active learning loop with wet lab feedback |
-| `05_bo_optimization` | Differential Evolution, wet-lab-aware BO context, shared iteration-aware model loading | Exploiting validated winners while proposing nearby informative variants |
+| `05_bo_optimization` | Differential Evolution with batched population scoring, wet-lab-aware BO context, shared iteration-aware model loading | Exploiting validated winners while proposing nearby informative variants |
 | `06_evaluation_explainability` | Stage-based evaluation, SHAP, PDPs, Interaction Contours, shared iteration-aware model loading | Measuring frozen-stage performance and understanding model drivers |
 | `07_next_formulations` | Strict next-batch generation from BO outputs + residual blind spots | Selecting exactly 10 future wet-lab formulations with a fixed 5 exploit / 5 explore split |
 
@@ -254,4 +254,5 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 - **Two optimization modes**: Fast random sampling OR proper Bayesian optimization
 - **Canonical observed context** (`04` writes `observed_context.csv`; `03`, `05`, and `06` all consume the same active iteration view)
 - **Wet-lab-aware BO** (`05` uses weighted observed context and seeds from top observed formulations)
+- **Vectorized DE scoring** (`05` evaluates each DE population in batches so GP prediction and penalty calculations are not repeated point-by-point)
 - **Strict next-batch planning** (`07` validates inputs, generates calibration probes from residual blind spots, and writes traceable next-batch artifacts)

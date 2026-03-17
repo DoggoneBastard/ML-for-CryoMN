@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module performs **proper Bayesian optimization** using Differential Evolution (DE) to maximize the configured acquisition function. By default it uses **Upper Confidence Bound (UCB)**, seeds the search from the best observed formulations, and then uses batch-mode local penalization to generate diverse nearby candidates.
+This module performs **proper Bayesian optimization** using Differential Evolution (DE) to maximize the configured acquisition function. By default it uses **Upper Confidence Bound (UCB)**, seeds the search from the best observed formulations, and then uses batch-mode local penalization to generate diverse nearby candidates. DE population scoring is evaluated in batches so GP prediction, acquisition, and penalty calculations run over each generation as a vectorized pass rather than point-by-point.
 
 ## Usage
 
@@ -55,6 +55,7 @@ These BO outputs are also the exploitation input to
 6. For each remaining candidate (sequentially):
    - Run Differential Evolution to find `x* = argmax(UCB(x) - penalty(x))`
    - DE starts from warm starts around top observed formulations instead of a blind search only
+   - Each DE generation is scored as a batch, so model inference and penalty evaluation are applied to the full population together
    - **Batch diversity**: Gaussian penalty repels DE away from previously found candidates
    - Constraint violations (DMSO, ingredient count, distance from observed support) are penalized
    - Exact duplicates are skipped
@@ -126,7 +127,7 @@ This matters for narrow peaks such as the validated ectoin + ethylene glycol reg
 | **Exploration** | Pure exploitation | Exploit observed winners, then explore nearby variants |
 | **Diversity** | Naturally diverse (random) | Batch-mode penalization |
 | **Observed context** | Combined literature + wet-lab rows | Combined literature + wet-lab rows with analytic BO weights |
-| **Speed** | Fast (~seconds) | Slower (~minutes) |
+| **Speed** | Fast | Slower overall, but DE population scoring is batched/vectorized |
 | **Quality** | May miss optima | Finds acquisition maxima while staying closer to validated support |
 
 ## When to Use Which?
