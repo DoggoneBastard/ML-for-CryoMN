@@ -1,0 +1,41 @@
+================================================================================
+CryoMN Validation Batch Recommendation
+================================================================================
+Target stage: iteration 4 (iteration_4_prior_mean)
+Candidate source mode: bo+random
+Blind-spot feedback source: stage 3
+Primary blind-spot features: dmso, sucrose, propylene_glycol, fbs
+
+Why this defaults to 05 BO:
+  The 05 candidate files already encode exploration/exploitation and stay closer
+  to supported chemistry. 03 is useful as a fallback pool, but not the default.
+
+Recommended exploitation picks:
+- 11.0mM dmso + 309.9mM ectoin + 1.56M ethylene_glycol
+  source: bo_candidates_dmso_free_iteration_4_prior_mean.csv rank 2
+  predicted viability: 77.7% +/- 14.5%
+  rationale: High predicted viability with comparatively manageable uncertainty. Blind-spot features: dmso.
+- 310.5mM ectoin + 1.57M ethylene_glycol + 0.1% hsa + 142.8mM raffinose
+  source: bo_candidates_general_iteration_4_prior_mean.csv rank 2
+  predicted viability: 75.9% +/- 15.3%
+  rationale: High predicted viability with comparatively manageable uncertainty.
+- 304.7mM ectoin + 1.55M ethylene_glycol + 6.5% fbs
+  source: bo_candidates_general_iteration_4_prior_mean.csv rank 4
+  predicted viability: 72.6% +/- 16.9%
+  rationale: High predicted viability with comparatively manageable uncertainty. Blind-spot features: fbs.
+- 304.7mM ectoin + 1.55M ethylene_glycol + 5.1% fbs + 0.6% hsa
+  source: bo_candidates_general_iteration_4_prior_mean.csv rank 7
+  predicted viability: 71.7% +/- 17.3%
+  rationale: High predicted viability with comparatively manageable uncertainty. Blind-spot features: fbs.
+
+Recommended exploration / calibration picks:
+- 307.1mM dmso + 256.3mM sucrose
+  source: candidates_general_iteration_4_prior_mean.csv rank 10
+  predicted viability: 39.4% +/- 22.9%
+  blindspot score: 24.85 | novelty score: 0.175
+  rationale: Chosen to improve calibration in a less-certain or under-modeled region. Blind-spot features: dmso, sucrose.
+- 12.8mM dmso + 2.4% hsa + 1.1% methylcellulose + 460.6mM sucrose + 97.3mM trehalose
+  source: candidates_dmso_free_iteration_4_prior_mean.csv rank 16
+  predicted viability: 36.5% +/- 23.7%
+  blindspot score: 4.90 | novelty score: 0.600
+  rationale: Chosen to improve calibration in a less-certain or under-modeled region. Blind-spot features: dmso, sucrose.
