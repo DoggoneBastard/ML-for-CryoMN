@@ -435,13 +435,13 @@ def print_summary(results: Sequence[Dict[str, object]]):
         if result["candidate_evaluation"]:
             print("  Candidate rank cross-reference:")
             for candidate_summary in result["candidate_evaluation"]:
-                top5 = candidate_summary["top_k"]["top_5"]
+                top10 = candidate_summary["top_k"]["top_10"]
                 print(
                     f"    {candidate_summary['file']}:"
                     f" tested_in_batch={candidate_summary['n_tested_later']},"
-                    f" top5_tested={top5['tested_count']},"
-                    f" top5_hit@50={top5['hit_rate_ge_50']},"
-                    f" top5_best={top5['best_actual_viability']}"
+                    f" top10_tested={top10['tested_count']},"
+                    f" top10_hit@50={top10['hit_rate_ge_50']},"
+                    f" top10_best={top10['best_actual_viability']}"
                 )
         else:
             print("  Candidate rank cross-reference: no candidate CSVs found")
