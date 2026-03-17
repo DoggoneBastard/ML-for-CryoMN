@@ -34,6 +34,11 @@ from sklearn.gaussian_process.kernels import Matern, WhiteKernel, ConstantKernel
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+HELPER_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), 'helper')
+if HELPER_DIR not in sys.path:
+    sys.path.insert(0, HELPER_DIR)
+
 from iteration_metadata import (
     PRIOR_MEAN_METHOD,
     activate_iteration_artifacts,

@@ -10,6 +10,14 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+HELPER_DIR = os.path.dirname(os.path.abspath(__file__))
+if HELPER_DIR not in sys.path:
+    sys.path.insert(0, HELPER_DIR)
+
+VALIDATION_LOOP_DIR = os.path.join(os.path.dirname(HELPER_DIR), '04_validation_loop')
+if VALIDATION_LOOP_DIR not in sys.path:
+    sys.path.insert(0, VALIDATION_LOOP_DIR)
+
 from iteration_metadata import (
     derive_iteration_dir,
     load_iteration_history,

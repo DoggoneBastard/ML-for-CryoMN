@@ -4,10 +4,15 @@ Shared helpers for iteration-aware observed-context data.
 """
 
 import os
+import sys
 from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+
+HELPER_DIR = os.path.dirname(os.path.abspath(__file__))
+if HELPER_DIR not in sys.path:
+    sys.path.insert(0, HELPER_DIR)
 
 from iteration_metadata import (
     PRIOR_MEAN_METHOD,

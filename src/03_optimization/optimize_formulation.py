@@ -22,11 +22,11 @@ from sklearn.preprocessing import StandardScaler
 from scipy.optimize import minimize, differential_evolution
 from scipy.stats import norm
 
-# Add validation loop to path for CompositeGP deserialization
+# Add shared helper modules to path for model resolution and observed-context loading
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-_validation_dir = os.path.join(os.path.dirname(_script_dir), '04_validation_loop')
-if _validation_dir not in sys.path:
-    sys.path.insert(0, _validation_dir)
+_helper_dir = os.path.join(os.path.dirname(_script_dir), 'helper')
+if _helper_dir not in sys.path:
+    sys.path.insert(0, _helper_dir)
 from active_model_resolver import ModelResolutionError, resolve_active_model  # noqa: E402
 from observed_context import load_observed_context  # noqa: E402
 
