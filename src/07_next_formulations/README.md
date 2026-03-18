@@ -4,10 +4,10 @@
 
 This module builds the next wet-lab batch from the active model state.
 
-It always writes exactly **10 formulations**:
+It always writes exactly **20 formulations**:
 
-- **5 exploitation** picks from the active iteration's `05_bo_optimization` outputs
-- **5 exploration/calibration** picks generated from the latest completed stage's residual blind spots
+- **10 exploitation** picks from the active iteration's `05_bo_optimization` outputs
+- **10 exploration/calibration** picks chosen from generated residual probes first, then BO fallback only if needed
 
 The script is intentionally strict. It validates required inputs before
 generation, validates all 10 outputs again before write, and aborts without
@@ -50,11 +50,14 @@ the latest completed wet-lab stage in `validation_results.csv` must be `N-1`.
 ### Exploration / Calibration
 
 - compute residuals on the latest completed wet-lab batch using that batch's frozen model
+- aggregate historical positive-residual anchors across all completed wet-lab stages
+- try positive-residual anchor thresholds in descending order: `10.0`, `8.0`, `5.0`, `2.0`, `0.0`
 - convert positive residuals into feature-level and pair-level blind-spot signals
-- generate probes by midpoint interpolation or local perturbation around underpredicted anchors
+- generate probes by midpoint interpolation or local perturbation around underpredicted anchors from any historical positive-residual stage
 - clip to BO bounds and enforce the BO-derived ingredient-count limit
 - re-score with the active model
-- backfill from BO only if fewer than 5 valid generated probes survive
+- keep generated probes ahead of BO fallback, even if a relaxed family cap is needed to fill the exploration bucket
+- backfill from BO only if fewer than 10 valid generated probes survive after the generated-only top-up pass
 
 This is why `07` does not use `03_optimization` as a primary source. The
 exploration half is designed directly from model failures, not from a random
@@ -78,6 +81,11 @@ Outputs are written under:
 - blind-spot and novelty scores
 - canonical feature columns in model order
 - formulation text and rationale
+
+The metadata and input-validation artifacts also record which residual thresholds
+were tried, which threshold was selected, how many exploration rows came
+from generated probes versus BO fallback, and which historical anchor stages
+fed the generated probes.
 
 ## Failure Mode
 

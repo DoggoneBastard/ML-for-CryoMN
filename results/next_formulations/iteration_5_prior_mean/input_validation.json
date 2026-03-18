@@ -1,0 +1,391 @@
+{
+  "status": "passed",
+  "target_stage": 5,
+  "target_iteration_dir": "iteration_5_prior_mean",
+  "feedback_stage": 4,
+  "feedback_iteration_dir": "iteration_4_prior_mean",
+  "validation_rows_total": 49,
+  "validation_rows_feedback_stage": 6,
+  "candidate_files": [
+    "results/bo_candidates_general_iteration_5_prior_mean.csv",
+    "results/bo_candidates_dmso_free_iteration_5_prior_mean.csv"
+  ],
+  "feature_count": 21,
+  "active_model_method": "prior_mean_correction",
+  "feedback_model_method": "prior_mean_correction",
+  "active_is_composite": true,
+  "feedback_is_composite": true,
+  "observed_context_rows": 247,
+  "effective_max_ingredients": 6,
+  "dmso_cap_percent": 5.0,
+  "feature_names": [
+    "betaine_M",
+    "creatine_M",
+    "dextran_pct",
+    "dmso_M",
+    "ectoin_M",
+    "ethylene_glycol_M",
+    "fbs_pct",
+    "glucose_M",
+    "glycerol_M",
+    "hes_pct",
+    "hsa_pct",
+    "human_serum_pct",
+    "hyaluronic_acid_pct",
+    "methylcellulose_pct",
+    "peg_3350_pct",
+    "proline_M",
+    "propylene_glycol_M",
+    "pvp_pct",
+    "raffinose_M",
+    "sucrose_M",
+    "trehalose_M"
+  ],
+  "positive_residual_thresholds_tried": [
+    10.0,
+    8.0,
+    5.0,
+    2.0,
+    0.0
+  ],
+  "selected_positive_residual_threshold": 8.0,
+  "anchor_count_at_selected_threshold": 7,
+  "generated_pool_rows_at_selected_threshold": 22,
+  "generated_explore_count": 10,
+  "fallback_explore_count": 0,
+  "generated_anchor_stage_counts": {
+    "1": 3,
+    "2": 14,
+    "3": 5,
+    "4": 4
+  },
+  "generated_anchor_stage_range": [
+    1,
+    4
+  ],
+  "generated_top_anchor_pairs": [
+    {
+      "pair": [
+        "dmso_M",
+        "sucrose_M"
+      ],
+      "count": 3
+    },
+    {
+      "pair": [
+        "propylene_glycol_M",
+        "sucrose_M"
+      ],
+      "count": 3
+    },
+    {
+      "pair": [
+        "ectoin_M",
+        "ethylene_glycol_M"
+      ],
+      "count": 3
+    },
+    {
+      "pair": [
+        "ethylene_glycol_M",
+        "fbs_pct"
+      ],
+      "count": 3
+    },
+    {
+      "pair": [
+        "ethylene_glycol_M",
+        "proline_M"
+      ],
+      "count": 2
+    },
+    {
+      "pair": [
+        "ethylene_glycol_M",
+        "hsa_pct"
+      ],
+      "count": 2
+    },
+    {
+      "pair": [
+        "fbs_pct",
+        "hsa_pct"
+      ],
+      "count": 2
+    },
+    {
+      "pair": [
+        "ectoin_M",
+        "fbs_pct"
+      ],
+      "count": 2
+    },
+    {
+      "pair": [
+        "hsa_pct",
+        "peg_3350_pct"
+      ],
+      "count": 2
+    }
+  ],
+  "positive_residual_threshold_attempts": [
+    {
+      "positive_residual_threshold": 10.0,
+      "anchor_count": 6,
+      "generated_pool_rows": 18,
+      "strict_selected_rows": 8,
+      "relaxed_selected_rows": 10
+    },
+    {
+      "positive_residual_threshold": 8.0,
+      "anchor_count": 7,
+      "generated_pool_rows": 22,
+      "strict_selected_rows": 10,
+      "relaxed_selected_rows": 10
+    },
+    {
+      "positive_residual_threshold": 5.0,
+      "anchor_count": 9,
+      "generated_pool_rows": 25,
+      "strict_selected_rows": 10,
+      "relaxed_selected_rows": 10
+    },
+    {
+      "positive_residual_threshold": 2.0,
+      "anchor_count": 14,
+      "generated_pool_rows": 26,
+      "strict_selected_rows": 10,
+      "relaxed_selected_rows": 10
+    },
+    {
+      "positive_residual_threshold": 0.0,
+      "anchor_count": 16,
+      "generated_pool_rows": 27,
+      "strict_selected_rows": 10,
+      "relaxed_selected_rows": 10
+    }
+  ],
+  "blindspot_signal_mode": "historical_residual_hybrid",
+  "blindspot_stage_range": [
+    0,
+    4
+  ],
+  "blindspot_recency_decay": 0.7,
+  "blindspot_region_prediction_threshold": 50.0,
+  "blindspot_region_weight": 1.5,
+  "blindspot_support_experiment_min": 2,
+  "blindspot_experiment_shrink_offset": 2.0,
+  "blindspot_batch_shrink_offset": 1.0,
+  "historical_positive_residual_rows": 16,
+  "top_positive_features": [
+    {
+      "score": 5.5253,
+      "final_signal": 5.5253,
+      "raw_signal": 12.432,
+      "positive_residual_experiment_support": 4,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.6667,
+      "batch_shrink": 0.6667,
+      "feature": "sucrose_M"
+    },
+    {
+      "score": 4.9898,
+      "final_signal": 4.9898,
+      "raw_signal": 11.2271,
+      "positive_residual_experiment_support": 4,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.6667,
+      "batch_shrink": 0.6667,
+      "feature": "dmso_M"
+    },
+    {
+      "score": 2.3143,
+      "final_signal": 2.3143,
+      "raw_signal": 5.7859,
+      "positive_residual_experiment_support": 3,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.6,
+      "batch_shrink": 0.6667,
+      "feature": "propylene_glycol_M"
+    },
+    {
+      "score": 2.073,
+      "final_signal": 2.073,
+      "raw_signal": 2.9399,
+      "positive_residual_experiment_support": 11,
+      "positive_residual_batch_support": 5,
+      "experiment_shrink": 0.8462,
+      "batch_shrink": 0.8333,
+      "feature": "ethylene_glycol_M"
+    },
+    {
+      "score": 1.5735,
+      "final_signal": 1.5735,
+      "raw_signal": 2.6225,
+      "positive_residual_experiment_support": 8,
+      "positive_residual_batch_support": 3,
+      "experiment_shrink": 0.8,
+      "batch_shrink": 0.75,
+      "feature": "ectoin_M"
+    },
+    {
+      "score": 0.9931,
+      "final_signal": 0.9931,
+      "raw_signal": 1.596,
+      "positive_residual_experiment_support": 7,
+      "positive_residual_batch_support": 4,
+      "experiment_shrink": 0.7778,
+      "batch_shrink": 0.8,
+      "feature": "fbs_pct"
+    },
+    {
+      "score": 0.7632,
+      "final_signal": 0.7632,
+      "raw_signal": 2.2896,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.6667,
+      "feature": "proline_M"
+    },
+    {
+      "score": 0.6429,
+      "final_signal": 0.6429,
+      "raw_signal": 1.6073,
+      "positive_residual_experiment_support": 3,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.6,
+      "batch_shrink": 0.6667,
+      "feature": "hsa_pct"
+    },
+    {
+      "score": 0.4911,
+      "final_signal": 0.4911,
+      "raw_signal": 1.9645,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 1,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.5,
+      "feature": "peg_3350_pct"
+    }
+  ],
+  "top_positive_pairs": [
+    {
+      "score": 8.8489,
+      "final_signal": 8.8489,
+      "raw_signal": 35.3955,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 1,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.5,
+      "pair": [
+        "dmso_M",
+        "sucrose_M"
+      ]
+    },
+    {
+      "score": 4.3196,
+      "final_signal": 4.3196,
+      "raw_signal": 12.9588,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.6667,
+      "pair": [
+        "propylene_glycol_M",
+        "sucrose_M"
+      ]
+    },
+    {
+      "score": 2.811,
+      "final_signal": 2.811,
+      "raw_signal": 4.6849,
+      "positive_residual_experiment_support": 8,
+      "positive_residual_batch_support": 3,
+      "experiment_shrink": 0.8,
+      "batch_shrink": 0.75,
+      "pair": [
+        "ectoin_M",
+        "ethylene_glycol_M"
+      ]
+    },
+    {
+      "score": 1.247,
+      "final_signal": 1.247,
+      "raw_signal": 2.2169,
+      "positive_residual_experiment_support": 6,
+      "positive_residual_batch_support": 3,
+      "experiment_shrink": 0.75,
+      "batch_shrink": 0.75,
+      "pair": [
+        "ethylene_glycol_M",
+        "fbs_pct"
+      ]
+    },
+    {
+      "score": 0.9389,
+      "final_signal": 0.9389,
+      "raw_signal": 2.8166,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.6667,
+      "pair": [
+        "ethylene_glycol_M",
+        "proline_M"
+      ]
+    },
+    {
+      "score": 0.7897,
+      "final_signal": 0.7897,
+      "raw_signal": 2.3691,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.6667,
+      "pair": [
+        "ethylene_glycol_M",
+        "hsa_pct"
+      ]
+    },
+    {
+      "score": 0.7897,
+      "final_signal": 0.7897,
+      "raw_signal": 2.3691,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 2,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.6667,
+      "pair": [
+        "fbs_pct",
+        "hsa_pct"
+      ]
+    },
+    {
+      "score": 0.6136,
+      "final_signal": 0.6136,
+      "raw_signal": 1.8407,
+      "positive_residual_experiment_support": 4,
+      "positive_residual_batch_support": 1,
+      "experiment_shrink": 0.6667,
+      "batch_shrink": 0.5,
+      "pair": [
+        "ectoin_M",
+        "fbs_pct"
+      ]
+    },
+    {
+      "score": 0.5944,
+      "final_signal": 0.5944,
+      "raw_signal": 2.3778,
+      "positive_residual_experiment_support": 2,
+      "positive_residual_batch_support": 1,
+      "experiment_shrink": 0.5,
+      "batch_shrink": 0.5,
+      "pair": [
+        "hsa_pct",
+        "peg_3350_pct"
+      ]
+    }
+  ]
+}

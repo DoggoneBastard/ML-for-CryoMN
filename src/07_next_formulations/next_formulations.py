@@ -52,14 +52,21 @@ EXPERIMENT_ID_PATTERN = re.compile(r"(\d+)")
 ITERATION_DIR_PATTERN = re.compile(r"^iteration_(\d+)(?:_[A-Za-z0-9_]+)?$")
 FEATURE_THRESHOLD = 1e-6
 GENERATION_SEED = 42
-EXPLOIT_COUNT = 5
-EXPLORE_COUNT = 5
+EXPLOIT_COUNT = 10
+EXPLORE_COUNT = 10
 TOTAL_COUNT = EXPLOIT_COUNT + EXPLORE_COUNT
-MIN_POSITIVE_RESIDUAL = 10.0
+POSITIVE_RESIDUAL_THRESHOLDS = [10.0, 8.0, 5.0, 2.0, 0.0]
 MEANINGFUL_ACTUAL_MIN = 50.0
 MIN_EXPLORATION_PREDICTION = 30.0
-EXPLOIT_FAMILY_LIMIT = 2
-EXPLORE_FAMILY_LIMIT = 1
+EXPLOIT_FAMILY_LIMIT = 3
+EXPLORE_FAMILY_LIMIT = 2
+BLINDSPOT_SIGNAL_MODE = "historical_residual_hybrid"
+BLINDSPOT_RECENCY_DECAY = 0.7
+BLINDSPOT_REGION_PREDICTION_THRESHOLD = 50.0
+BLINDSPOT_REGION_WEIGHT = 1.5
+BLINDSPOT_SUPPORT_EXPERIMENT_MIN = 2
+BLINDSPOT_EXPERIMENT_SHRINK_OFFSET = 2.0
+BLINDSPOT_BATCH_SHRINK_OFFSET = 1.0
 REQUIRED_VALIDATION_COLUMNS = {"experiment_id", "experiment_date", "viability_measured"}
 REQUIRED_CANDIDATE_COLUMNS = {
     "rank",
@@ -215,7 +222,11 @@ def choose_iteration_dir(stage: int, preferred_iteration_dir: Optional[str] = No
     return matches[-1]
 
 
-def load_stage_artifacts(stage: int, preferred_iteration_dir: Optional[str] = None) -> StageArtifacts:
+def load_stage_artifacts(
+    stage: int,
+    preferred_iteration_dir: Optional[str] = None,
+    require_observed_context: bool = True,
+) -> StageArtifacts:
     """Load one saved stage checkpoint plus its observed context."""
     iteration_dir = choose_iteration_dir(stage, preferred_iteration_dir)
     model_dir = MODELS_DIR / iteration_dir
@@ -249,16 +260,19 @@ def load_stage_artifacts(stage: int, preferred_iteration_dir: Optional[str] = No
             scaler = pickle.load(handle)
 
     observed_context_path = model_dir / "observed_context.csv"
-    if not observed_context_path.exists():
+    if observed_context_path.exists():
+        observed_context = pd.read_csv(observed_context_path)
+        missing_observed = [name for name in feature_names if name not in observed_context.columns]
+        if missing_observed:
+            raise ValidationError(
+                f"{observed_context_path} is missing feature columns: {', '.join(missing_observed)}"
+            )
+        if "viability_percent" not in observed_context.columns:
+            raise ValidationError(f"{observed_context_path} is missing viability_percent.")
+    elif require_observed_context:
         raise ValidationError(f"Missing observed context artifact: {observed_context_path}")
-    observed_context = pd.read_csv(observed_context_path)
-    missing_observed = [name for name in feature_names if name not in observed_context.columns]
-    if missing_observed:
-        raise ValidationError(
-            f"{observed_context_path} is missing feature columns: {', '.join(missing_observed)}"
-        )
-    if "viability_percent" not in observed_context.columns:
-        raise ValidationError(f"{observed_context_path} is missing viability_percent.")
+    else:
+        observed_context = pd.DataFrame(columns=[*feature_names, "viability_percent"])
 
     return StageArtifacts(
         stage=stage,
@@ -416,64 +430,88 @@ def load_bo_candidate_pool(
     return pool, candidate_paths
 
 
+def compute_stage_batch(
+    validation_df: pd.DataFrame,
+    stage_artifacts: StageArtifacts,
+    active_stage: Optional[StageArtifacts] = None,
+) -> pd.DataFrame:
+    """Load one completed stage batch and attach frozen-model residuals."""
+    batch = validation_df[validation_df["stage"] == stage_artifacts.stage].copy()
+    if batch.empty:
+        raise ValidationError(f"No validation rows found for completed stage {stage_artifacts.stage}.")
+
+    stage_features = [name for name in stage_artifacts.feature_names if name in batch.columns]
+    missing_stage_features = [name for name in stage_artifacts.feature_names if name not in batch.columns]
+    if missing_stage_features:
+        raise ValidationError(
+            f"Validation data is missing feature columns required by stage {stage_artifacts.stage}: "
+            f"{', '.join(missing_stage_features)}"
+        )
+
+    X_stage = batch.reindex(columns=stage_features, fill_value=0.0).fillna(0.0).to_numpy(float)
+    predicted, uncertainty = predict(
+        stage_artifacts.model,
+        stage_artifacts.scaler,
+        X_stage,
+        stage_artifacts.is_composite_model,
+    )
+    batch["predicted_stage_model"] = predicted
+    batch["uncertainty_stage_model"] = uncertainty
+    batch["residual"] = batch["viability_measured"].astype(float) - batch["predicted_stage_model"].astype(float)
+    batch["signature"] = [
+        format_formulation(row, stage_artifacts.feature_names) for _, row in batch.iterrows()
+    ]
+    batch["frozen_stage"] = int(stage_artifacts.stage)
+    batch["frozen_iteration_dir"] = str(stage_artifacts.iteration_dir)
+
+    if active_stage is not None:
+        X_active = batch.reindex(columns=active_stage.feature_names, fill_value=0.0).fillna(0.0).to_numpy(float)
+        active_predicted, active_uncertainty = predict(
+            active_stage.model,
+            active_stage.scaler,
+            X_active,
+            active_stage.is_composite_model,
+        )
+        batch["predicted_active_model"] = active_predicted
+        batch["uncertainty_active_model"] = active_uncertainty
+
+    return batch
+
+
 def compute_previous_stage_batch(
     validation_df: pd.DataFrame,
     previous_stage: StageArtifacts,
 ) -> pd.DataFrame:
     """Load the most recent completed batch and attach previous-stage residuals."""
-    batch = validation_df[validation_df["stage"] == previous_stage.stage].copy()
-    if batch.empty:
-        raise ValidationError(f"No validation rows found for completed stage {previous_stage.stage}.")
-
-    X = batch.reindex(columns=previous_stage.feature_names, fill_value=0.0).fillna(0.0).to_numpy(float)
-    predicted, uncertainty = predict(
-        previous_stage.model,
-        previous_stage.scaler,
-        X,
-        previous_stage.is_composite_model,
-    )
-    batch["predicted_previous_stage"] = predicted
-    batch["uncertainty_previous_stage"] = uncertainty
-    batch["residual"] = batch["viability_measured"].astype(float) - batch["predicted_previous_stage"].astype(float)
-    batch["signature"] = [
-        format_formulation(row, previous_stage.feature_names) for _, row in batch.iterrows()
-    ]
+    batch = compute_stage_batch(validation_df, previous_stage)
+    batch["predicted_previous_stage"] = batch["predicted_stage_model"]
+    batch["uncertainty_previous_stage"] = batch["uncertainty_stage_model"]
     return batch
 
 
-def compute_blindspot_signals(
-    previous_batch: pd.DataFrame,
+def build_historical_residual_df(
+    validation_df: pd.DataFrame,
+    active_stage: StageArtifacts,
+    completed_stages: Sequence[int],
+) -> pd.DataFrame:
+    """Assemble all completed wet-lab batches scored by their own frozen models."""
+    historical_batches: List[pd.DataFrame] = []
+    for stage in completed_stages:
+        stage_artifacts = load_stage_artifacts(int(stage), require_observed_context=False)
+        historical_batches.append(compute_stage_batch(validation_df, stage_artifacts, active_stage=active_stage))
+
+    if not historical_batches:
+        raise ValidationError("No completed validation stages are available for historical blind-spot scoring.")
+
+    historical_df = pd.concat(historical_batches, ignore_index=True)
+    return historical_df
+
+
+def build_wetlab_coverage_counts(
     validation_df: pd.DataFrame,
     feature_names: Sequence[str],
-) -> Tuple[Dict[str, float], Dict[Tuple[str, str], float], Dict[str, int], Dict[Tuple[str, str], int]]:
-    """Summarize positive residual blind spots at feature and pair level."""
-    feature_signal = {name: 0.0 for name in feature_names}
-    pair_signal: Dict[Tuple[str, str], float] = {}
-    feature_counts = {name: 0 for name in feature_names}
-    pair_counts: Dict[Tuple[str, str], int] = {}
-
-    for _, row in previous_batch.iterrows():
-        residual = max(float(row["residual"]), 0.0)
-        if residual <= 0.0:
-            continue
-        active = active_features(row, feature_names)
-        if not active:
-            continue
-        share = residual / len(active)
-        for feature_name in active:
-            feature_signal[feature_name] += share
-            feature_counts[feature_name] += 1
-        for pair in combinations(sorted(active), 2):
-            pair_signal[pair] = pair_signal.get(pair, 0.0) + residual / max(1, len(active) - 1)
-            pair_counts[pair] = pair_counts.get(pair, 0) + 1
-
-    for feature_name, count in feature_counts.items():
-        if count:
-            feature_signal[feature_name] /= count
-    for pair, count in list(pair_counts.items()):
-        if count:
-            pair_signal[pair] /= count
-
+) -> Tuple[Dict[str, int], Dict[Tuple[str, str], int]]:
+    """Count feature and pair coverage across all measured wet-lab history."""
     wetlab_feature_counts = {name: 0 for name in feature_names}
     wetlab_pair_counts: Dict[Tuple[str, str], int] = {}
     for _, row in validation_df.iterrows():
@@ -482,8 +520,192 @@ def compute_blindspot_signals(
             wetlab_feature_counts[feature_name] += 1
         for pair in combinations(sorted(active), 2):
             wetlab_pair_counts[pair] = wetlab_pair_counts.get(pair, 0) + 1
+    return wetlab_feature_counts, wetlab_pair_counts
 
-    return feature_signal, pair_signal, wetlab_feature_counts, wetlab_pair_counts
+
+def finalize_blindspot_details(
+    raw_signal_totals: Dict,
+    weight_totals: Dict,
+    experiment_support: Dict,
+    batch_support: Dict,
+) -> Tuple[Dict, Dict]:
+    """Convert raw weighted residual accumulators into final support-adjusted signals."""
+    final_signal = {key: 0.0 for key in raw_signal_totals}
+    details: Dict = {}
+
+    for key, raw_total in raw_signal_totals.items():
+        total_weight = float(weight_totals.get(key, 0.0))
+        experiment_count = len(experiment_support.get(key, set()))
+        batch_count = len(batch_support.get(key, set()))
+        raw_signal = raw_total / total_weight if total_weight > 0.0 else 0.0
+        experiment_shrink = (
+            experiment_count / (experiment_count + BLINDSPOT_EXPERIMENT_SHRINK_OFFSET)
+            if experiment_count
+            else 0.0
+        )
+        batch_shrink = (
+            batch_count / (batch_count + BLINDSPOT_BATCH_SHRINK_OFFSET)
+            if batch_count
+            else 0.0
+        )
+        passes_support_filter = experiment_count >= BLINDSPOT_SUPPORT_EXPERIMENT_MIN
+        adjusted_signal = (
+            raw_signal * experiment_shrink * batch_shrink
+            if passes_support_filter
+            else 0.0
+        )
+        final_signal[key] = adjusted_signal
+        details[key] = {
+            "raw_signal": raw_signal,
+            "final_signal": adjusted_signal,
+            "positive_residual_experiment_support": experiment_count,
+            "positive_residual_batch_support": batch_count,
+            "experiment_shrink": experiment_shrink,
+            "batch_shrink": batch_shrink,
+            "passes_support_filter": passes_support_filter,
+        }
+
+    return final_signal, details
+
+
+def top_signal_entries(
+    signal_details: Dict,
+    *,
+    is_pair: bool = False,
+    limit: int = 10,
+) -> List[Dict]:
+    """Return the top support-adjusted feature or pair signal entries."""
+    ranked = sorted(
+        signal_details.items(),
+        key=lambda item: (
+            float(item[1]["final_signal"]),
+            float(item[1]["raw_signal"]),
+            int(item[1]["positive_residual_experiment_support"]),
+            int(item[1]["positive_residual_batch_support"]),
+        ),
+        reverse=True,
+    )
+
+    output: List[Dict] = []
+    for key, detail in ranked:
+        if float(detail["final_signal"]) <= 0.0:
+            continue
+        entry = {
+            "score": round_or_none(detail["final_signal"]),
+            "final_signal": round_or_none(detail["final_signal"]),
+            "raw_signal": round_or_none(detail["raw_signal"]),
+            "positive_residual_experiment_support": int(detail["positive_residual_experiment_support"]),
+            "positive_residual_batch_support": int(detail["positive_residual_batch_support"]),
+            "experiment_shrink": round_or_none(detail["experiment_shrink"]),
+            "batch_shrink": round_or_none(detail["batch_shrink"]),
+        }
+        if is_pair:
+            entry["pair"] = list(key)
+        else:
+            entry["feature"] = str(key)
+        output.append(entry)
+        if len(output) >= limit:
+            break
+    return output
+
+
+def compute_blindspot_signals(
+    historical_residual_df: pd.DataFrame,
+    validation_df: pd.DataFrame,
+    feature_names: Sequence[str],
+    last_completed_stage: int,
+) -> Tuple[
+    Dict[str, float],
+    Dict[Tuple[str, str], float],
+    Dict[str, int],
+    Dict[Tuple[str, str], int],
+    Dict[str, Dict[str, float]],
+    Dict[Tuple[str, str], Dict[str, float]],
+    Dict[str, object],
+]:
+    """Summarize support-adjusted blind spots from historical positive residuals."""
+    feature_raw_totals = {name: 0.0 for name in feature_names}
+    feature_weight_totals = {name: 0.0 for name in feature_names}
+    feature_experiment_support = {name: set() for name in feature_names}
+    feature_batch_support = {name: set() for name in feature_names}
+
+    pair_raw_totals: Dict[Tuple[str, str], float] = {}
+    pair_weight_totals: Dict[Tuple[str, str], float] = {}
+    pair_experiment_support: Dict[Tuple[str, str], set[str]] = {}
+    pair_batch_support: Dict[Tuple[str, str], set[int]] = {}
+
+    positive_rows = historical_residual_df[historical_residual_df["residual"].astype(float) > 0.0].copy()
+    for _, row in positive_rows.iterrows():
+        active = active_features(row, feature_names)
+        if not active:
+            continue
+
+        residual = float(row["residual"])
+        stage = int(row["stage"])
+        experiment_id = str(row["experiment_id"])
+        recency_weight = BLINDSPOT_RECENCY_DECAY ** max(0, last_completed_stage - stage)
+        region_weight = (
+            BLINDSPOT_REGION_WEIGHT
+            if float(row.get("predicted_active_model", 0.0)) >= BLINDSPOT_REGION_PREDICTION_THRESHOLD
+            else 1.0
+        )
+        row_weight = recency_weight * region_weight
+
+        feature_share = residual / len(active)
+        for feature_name in active:
+            feature_raw_totals[feature_name] += row_weight * feature_share
+            feature_weight_totals[feature_name] += row_weight
+            feature_experiment_support[feature_name].add(experiment_id)
+            feature_batch_support[feature_name].add(stage)
+
+        pair_share = residual / max(1, len(active) - 1)
+        for pair in combinations(sorted(active), 2):
+            pair_raw_totals[pair] = pair_raw_totals.get(pair, 0.0) + row_weight * pair_share
+            pair_weight_totals[pair] = pair_weight_totals.get(pair, 0.0) + row_weight
+            pair_experiment_support.setdefault(pair, set()).add(experiment_id)
+            pair_batch_support.setdefault(pair, set()).add(stage)
+
+    feature_signal, feature_details = finalize_blindspot_details(
+        feature_raw_totals,
+        feature_weight_totals,
+        feature_experiment_support,
+        feature_batch_support,
+    )
+    pair_signal, pair_details = finalize_blindspot_details(
+        pair_raw_totals,
+        pair_weight_totals,
+        pair_experiment_support,
+        pair_batch_support,
+    )
+
+    wetlab_feature_counts, wetlab_pair_counts = build_wetlab_coverage_counts(validation_df, feature_names)
+
+    blindspot_audit = {
+        "blindspot_signal_mode": BLINDSPOT_SIGNAL_MODE,
+        "blindspot_stage_range": [
+            int(historical_residual_df["stage"].min()),
+            int(historical_residual_df["stage"].max()),
+        ],
+        "blindspot_recency_decay": float(BLINDSPOT_RECENCY_DECAY),
+        "blindspot_region_prediction_threshold": float(BLINDSPOT_REGION_PREDICTION_THRESHOLD),
+        "blindspot_region_weight": float(BLINDSPOT_REGION_WEIGHT),
+        "blindspot_support_experiment_min": int(BLINDSPOT_SUPPORT_EXPERIMENT_MIN),
+        "blindspot_experiment_shrink_offset": float(BLINDSPOT_EXPERIMENT_SHRINK_OFFSET),
+        "blindspot_batch_shrink_offset": float(BLINDSPOT_BATCH_SHRINK_OFFSET),
+        "historical_positive_residual_rows": int(len(positive_rows)),
+        "top_positive_features": top_signal_entries(feature_details, is_pair=False),
+        "top_positive_pairs": top_signal_entries(pair_details, is_pair=True),
+    }
+
+    return (
+        feature_signal,
+        pair_signal,
+        wetlab_feature_counts,
+        wetlab_pair_counts,
+        feature_details,
+        pair_details,
+        blindspot_audit,
+    )
 
 
 def agree_within_ten_percent(left: float, right: float) -> bool:
@@ -733,38 +955,49 @@ def rank_generated_probes(
 
 def build_generated_probe_pool(
     active_stage: StageArtifacts,
-    previous_stage: StageArtifacts,
-    previous_batch: pd.DataFrame,
-    validation_df: pd.DataFrame,
+    historical_residual_df: pd.DataFrame,
     optimizer: BayesianOptimizer,
     feature_signal: Dict[str, float],
     pair_signal: Dict[Tuple[str, str], float],
     wetlab_feature_counts: Dict[str, int],
     wetlab_pair_counts: Dict[Tuple[str, str], int],
     tested_signatures: set[str],
-) -> pd.DataFrame:
+    min_positive_residual: float,
+) -> Tuple[pd.DataFrame, Dict[str, object]]:
     """Generate calibration probes from positive-residual blind spots."""
-    previous_batch = previous_batch.copy()
-    previous_batch["actual_priority"] = previous_batch["viability_measured"].astype(float) >= MEANINGFUL_ACTUAL_MIN
-    previous_batch["is_positive_anchor"] = previous_batch["residual"].astype(float) > MIN_POSITIVE_RESIDUAL
+    anchor_df = historical_residual_df.copy()
+    anchor_df["actual_priority"] = anchor_df["viability_measured"].astype(float) >= MEANINGFUL_ACTUAL_MIN
+    anchor_df["promising_region"] = (
+        anchor_df.get("predicted_active_model", pd.Series(np.zeros(len(anchor_df)), index=anchor_df.index))
+        .astype(float)
+        >= BLINDSPOT_REGION_PREDICTION_THRESHOLD
+    )
+    anchor_df["is_positive_anchor"] = anchor_df["residual"].astype(float) > min_positive_residual
 
-    positive_rows = previous_batch[previous_batch["is_positive_anchor"]].copy()
+    positive_rows = anchor_df[anchor_df["is_positive_anchor"]].copy()
     if positive_rows.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), {
+            "anchor_count": 0,
+            "generated_anchor_stage_counts": {},
+            "generated_anchor_stage_range": [],
+            "generated_top_anchor_pairs": [],
+        }
 
     anchor_rows = positive_rows.sort_values(
-        ["actual_priority", "residual", "viability_measured"],
-        ascending=[False, False, False],
+        ["promising_region", "actual_priority", "residual", "stage", "viability_measured"],
+        ascending=[False, False, False, False, False],
     ).reset_index(drop=True)
 
     pair_to_rows: Dict[Tuple[str, str], List[pd.Series]] = {}
     for _, row in anchor_rows.iterrows():
-        active = active_features(row, previous_stage.feature_names)
+        active = active_features(row, active_stage.feature_names)
         for pair in combinations(sorted(active), 2):
             pair_to_rows.setdefault(pair, []).append(row)
 
     generated_records: List[Dict] = []
     seen_signatures: set[str] = set()
+    generated_anchor_stages: List[int] = []
+    generated_anchor_pairs: List[Tuple[str, str]] = []
     ranked_pairs = [
         pair
         for pair, score in sorted(pair_signal.items(), key=lambda item: item[1], reverse=True)
@@ -783,7 +1016,7 @@ def build_generated_probe_pool(
                     midpoint,
                     active_stage.feature_names,
                     origin="generated_probe",
-                    anchor_stage=previous_stage.stage,
+                    anchor_stage=int(anchors[0]["stage"]),
                     anchor_experiments=[
                         str(anchors[0]["experiment_id"]),
                         str(anchors[1]["experiment_id"]),
@@ -797,6 +1030,8 @@ def build_generated_probe_pool(
                 if midpoint_record["signature"] not in tested_signatures:
                     generated_records.append(midpoint_record)
                     seen_signatures.add(midpoint_record["signature"])
+                    generated_anchor_stages.extend([int(anchors[0]["stage"]), int(anchors[1]["stage"])])
+                    generated_anchor_pairs.append(pair)
 
         anchor = anchors[0]
         for scale in (0.75, 1.25):
@@ -807,7 +1042,7 @@ def build_generated_probe_pool(
                 probe,
                 active_stage.feature_names,
                 origin="generated_probe",
-                anchor_stage=previous_stage.stage,
+                anchor_stage=int(anchor["stage"]),
                 anchor_experiments=[str(anchor["experiment_id"])],
             )
             if record["signature"] in tested_signatures or record["signature"] in seen_signatures:
@@ -819,9 +1054,16 @@ def build_generated_probe_pool(
             )
             generated_records.append(record)
             seen_signatures.add(record["signature"])
+            generated_anchor_stages.append(int(anchor["stage"]))
+            generated_anchor_pairs.append(pair)
 
     if not generated_records:
-        return pd.DataFrame()
+        return pd.DataFrame(), {
+            "anchor_count": int(len(anchor_rows)),
+            "generated_anchor_stage_counts": {},
+            "generated_anchor_stage_range": [],
+            "generated_top_anchor_pairs": [],
+        }
 
     generated = score_records_with_active_model(
         generated_records,
@@ -836,7 +1078,27 @@ def build_generated_probe_pool(
         & (generated["dmso_percent"] <= optimizer.config.max_dmso_percent + 1e-6)
     ].copy()
     generated = generated.drop_duplicates(subset=["signature"]).reset_index(drop=True)
-    return rank_generated_probes(generated)
+    ranked_generated = rank_generated_probes(generated)
+
+    stage_counts = pd.Series(generated_anchor_stages).value_counts().sort_index()
+    pair_counts = pd.Series(generated_anchor_pairs).value_counts()
+    generated_audit = {
+        "anchor_count": int(len(anchor_rows)),
+        "generated_anchor_stage_counts": {str(int(stage)): int(count) for stage, count in stage_counts.items()},
+        "generated_anchor_stage_range": (
+            [int(min(generated_anchor_stages)), int(max(generated_anchor_stages))]
+            if generated_anchor_stages
+            else []
+        ),
+        "generated_top_anchor_pairs": [
+            {
+                "pair": list(pair),
+                "count": int(count),
+            }
+            for pair, count in pair_counts.items()
+        ][:10],
+    }
+    return ranked_generated, generated_audit
 
 
 def build_bo_exploration_fallback_pool(
@@ -881,9 +1143,19 @@ def select_diverse_rows(
     disallowed_signatures: Optional[set[str]] = None,
 ) -> List[Dict]:
     """Select diverse rows using a simple family cap."""
+    if scored.empty:
+        return []
+
+    required_columns = [score_column, "predicted_viability", "uncertainty", "signature", "chemistry_family"]
+    missing_columns = [column for column in required_columns if column not in scored.columns]
+    if missing_columns:
+        raise ValidationError(
+            "Selection pool is missing required columns: " + ", ".join(sorted(missing_columns))
+        )
+
     selected: List[Dict] = []
     family_counts: Dict[str, int] = {}
-    disallowed_signatures = disallowed_signatures or set()
+    blocked_signatures = set(disallowed_signatures or set())
 
     ranked = scored.sort_values(
         [score_column, "predicted_viability", "uncertainty"],
@@ -891,7 +1163,7 @@ def select_diverse_rows(
     )
     for _, row in ranked.iterrows():
         signature = str(row["signature"])
-        if signature in disallowed_signatures:
+        if signature in blocked_signatures:
             continue
         if float(row["predicted_viability"]) < min_predicted_viability:
             continue
@@ -899,11 +1171,131 @@ def select_diverse_rows(
         if family_counts.get(family, 0) >= family_limit:
             continue
         selected.append(row.to_dict())
-        disallowed_signatures.add(signature)
+        blocked_signatures.add(signature)
         family_counts[family] = family_counts.get(family, 0) + 1
         if len(selected) >= count:
             break
     return selected
+
+
+def select_generated_exploration_rows(
+    generated_pool: pd.DataFrame,
+    already_selected_signatures: set[str],
+) -> Tuple[List[Dict], Dict[str, int]]:
+    """Select generated exploration rows before consulting BO fallback."""
+    strict_selected = select_diverse_rows(
+        generated_pool,
+        count=EXPLORE_COUNT,
+        score_column="exploration_score",
+        family_limit=EXPLORE_FAMILY_LIMIT,
+        min_predicted_viability=MIN_EXPLORATION_PREDICTION,
+        disallowed_signatures=set(already_selected_signatures),
+    )
+    selected = list(strict_selected)
+    if len(selected) < EXPLORE_COUNT:
+        disallowed = set(already_selected_signatures) | {str(row["signature"]) for row in selected}
+        relaxed_topup = select_diverse_rows(
+            generated_pool,
+            count=EXPLORE_COUNT - len(selected),
+            score_column="exploration_score",
+            family_limit=EXPLORE_COUNT,
+            min_predicted_viability=MIN_EXPLORATION_PREDICTION,
+            disallowed_signatures=disallowed,
+        )
+        selected.extend(relaxed_topup)
+    return selected, {
+        "strict_selected_rows": len(strict_selected),
+        "relaxed_selected_rows": len(selected),
+    }
+
+
+def choose_generated_exploration_rows(
+    active_stage: StageArtifacts,
+    historical_residual_df: pd.DataFrame,
+    optimizer: BayesianOptimizer,
+    feature_signal: Dict[str, float],
+    pair_signal: Dict[Tuple[str, str], float],
+    wetlab_feature_counts: Dict[str, int],
+    wetlab_pair_counts: Dict[Tuple[str, str], int],
+    tested_signatures: set[str],
+    already_selected_signatures: set[str],
+    positive_residual_thresholds: Sequence[float] = POSITIVE_RESIDUAL_THRESHOLDS,
+) -> Dict[str, object]:
+    """Select the best generated exploration slate across configured thresholds."""
+    threshold_values = [float(value) for value in positive_residual_thresholds]
+    if not threshold_values:
+        raise ValidationError("No positive residual thresholds configured for exploration generation.")
+
+    attempts: List[Dict[str, object]] = []
+    best_attempt: Optional[Dict[str, object]] = None
+    residuals = historical_residual_df["residual"].astype(float)
+
+    for threshold in threshold_values:
+        anchor_count = int((residuals > threshold).sum())
+        generated_pool, generated_audit = build_generated_probe_pool(
+            active_stage,
+            historical_residual_df,
+            optimizer,
+            feature_signal,
+            pair_signal,
+            wetlab_feature_counts,
+            wetlab_pair_counts,
+            tested_signatures,
+            min_positive_residual=threshold,
+        )
+        selected_rows, selection_counts = select_generated_exploration_rows(
+            generated_pool,
+            already_selected_signatures,
+        )
+        attempt = {
+            "positive_residual_threshold": threshold,
+            "anchor_count": anchor_count,
+            "generated_pool_rows": int(len(generated_pool)),
+            "strict_selected_rows": int(selection_counts["strict_selected_rows"]),
+            "relaxed_selected_rows": int(selection_counts["relaxed_selected_rows"]),
+            "selected_rows": [dict(row) for row in selected_rows],
+            "generated_anchor_stage_counts": dict(generated_audit["generated_anchor_stage_counts"]),
+            "generated_anchor_stage_range": list(generated_audit["generated_anchor_stage_range"]),
+            "generated_top_anchor_pairs": list(generated_audit["generated_top_anchor_pairs"]),
+        }
+        attempts.append(attempt)
+
+        if best_attempt is None:
+            best_attempt = attempt
+            continue
+
+        attempt_key = (attempt["relaxed_selected_rows"], attempt["strict_selected_rows"])
+        best_key = (best_attempt["relaxed_selected_rows"], best_attempt["strict_selected_rows"])
+        if attempt_key > best_key:
+            best_attempt = attempt
+
+    assert best_attempt is not None
+
+    attempt_summaries = [
+        {
+            "positive_residual_threshold": float(attempt["positive_residual_threshold"]),
+            "anchor_count": int(attempt["anchor_count"]),
+            "generated_pool_rows": int(attempt["generated_pool_rows"]),
+            "strict_selected_rows": int(attempt["strict_selected_rows"]),
+            "relaxed_selected_rows": int(attempt["relaxed_selected_rows"]),
+        }
+        for attempt in attempts
+    ]
+
+    return {
+        "selected_rows": [dict(row) for row in best_attempt["selected_rows"]],
+        "audit": {
+            "positive_residual_thresholds_tried": threshold_values,
+            "selected_positive_residual_threshold": float(best_attempt["positive_residual_threshold"]),
+            "anchor_count_at_selected_threshold": int(best_attempt["anchor_count"]),
+            "generated_pool_rows_at_selected_threshold": int(best_attempt["generated_pool_rows"]),
+            "generated_explore_count": int(len(best_attempt["selected_rows"])),
+            "generated_anchor_stage_counts": dict(best_attempt["generated_anchor_stage_counts"]),
+            "generated_anchor_stage_range": list(best_attempt["generated_anchor_stage_range"]),
+            "generated_top_anchor_pairs": list(best_attempt["generated_top_anchor_pairs"]),
+            "positive_residual_threshold_attempts": attempt_summaries,
+        },
+    }
 
 
 def build_exploitation_selection(
@@ -943,21 +1335,14 @@ def build_exploitation_selection(
 
 
 def build_exploration_selection(
-    generated_pool: pd.DataFrame,
+    generated_rows: List[Dict],
     fallback_pool: pd.DataFrame,
     already_selected_signatures: set[str],
-) -> List[Dict]:
+) -> Tuple[List[Dict], int]:
     """Select the final exploration rows, falling back to BO rows if needed."""
-    selected = select_diverse_rows(
-        generated_pool,
-        count=EXPLORE_COUNT,
-        score_column="exploration_score",
-        family_limit=EXPLORE_FAMILY_LIMIT,
-        min_predicted_viability=MIN_EXPLORATION_PREDICTION,
-        disallowed_signatures=set(already_selected_signatures),
-    )
+    selected = [dict(row) for row in generated_rows]
     if len(selected) >= EXPLORE_COUNT:
-        return selected
+        return selected, 0
 
     disallowed = {str(row["signature"]) for row in selected} | set(already_selected_signatures)
     selected_families = {str(row["chemistry_family"]) for row in selected}
@@ -972,32 +1357,23 @@ def build_exploration_selection(
         disallowed_signatures=disallowed,
     )
     if len(fallback_rows) < remaining:
-        fallback_rows = select_diverse_rows(
+        disallowed |= {str(row["signature"]) for row in fallback_rows}
+        fallback_rows.extend(
+            select_diverse_rows(
             fallback_pool,
-            count=remaining,
+            count=remaining - len(fallback_rows),
             score_column="exploration_score",
             family_limit=EXPLORE_COUNT,
             min_predicted_viability=MIN_EXPLORATION_PREDICTION,
             disallowed_signatures=disallowed,
+        )
         )
     for row in fallback_rows:
         row["origin"] = "explore_fallback"
         if not row.get("rationale"):
             row["rationale"] = "High-uncertainty BO fallback in a blind-spot chemistry family."
     selected.extend(fallback_rows)
-    return selected
-
-
-def ensure_dmso_probe_present(explore_rows: List[Dict]) -> None:
-    """Fail if exploration missed the known DMSO+sucrose blind spot in the current data."""
-    for row in explore_rows:
-        active = active_features(pd.Series(row), [name for name in row.keys() if is_feature_column(name)])
-        if "dmso_M" in active and "sucrose_M" in active:
-            return
-    raise ValidationError(
-        "Exploration selection did not include a DMSO+sucrose probe, which should be present "
-        "given the current positive-residual blind spot."
-    )
+    return selected, len(fallback_rows)
 
 
 def validate_output_rows(
@@ -1071,6 +1447,8 @@ def build_summary_text(
     explore_rows: List[Dict],
     feature_signal: Dict[str, float],
     pair_signal: Dict[Tuple[str, str], float],
+    exploration_audit: Dict[str, object],
+    blindspot_audit: Dict[str, object],
 ) -> str:
     """Render a human-readable summary."""
     top_features = [
@@ -1083,6 +1461,18 @@ def build_summary_text(
         for pair, score in sorted(pair_signal.items(), key=lambda item: item[1], reverse=True)
         if score > 0.0
     ][:5]
+    thresholds_tried = [float(value) for value in exploration_audit["positive_residual_thresholds_tried"]]
+    default_threshold = thresholds_tried[0]
+    selected_threshold = float(exploration_audit["selected_positive_residual_threshold"])
+    generated_explore_count = int(exploration_audit["generated_explore_count"])
+    fallback_explore_count = int(exploration_audit["fallback_explore_count"])
+    if math.isclose(selected_threshold, default_threshold):
+        threshold_note = f"none (kept default {default_threshold:.1f})"
+    else:
+        threshold_note = f"relaxed from {default_threshold:.1f} to {selected_threshold:.1f}"
+    blindspot_stage_range = blindspot_audit["blindspot_stage_range"]
+    generated_anchor_stage_range = exploration_audit.get("generated_anchor_stage_range", [])
+    generated_anchor_stage_counts = exploration_audit.get("generated_anchor_stage_counts", {})
 
     lines = [
         "=" * 80,
@@ -1090,7 +1480,28 @@ def build_summary_text(
         "=" * 80,
         f"Target stage: {format_stage_label(active_stage.stage, active_stage.iteration_dir)}",
         f"Residual feedback stage: {format_stage_label(previous_stage.stage, previous_stage.iteration_dir)}",
+        f"Blind-spot signal stages: {blindspot_stage_range[0]} to {blindspot_stage_range[1]}",
         f"Output split: {EXPLOIT_COUNT} exploitation + {EXPLORE_COUNT} exploration",
+        "Positive residual thresholds tried: " + ", ".join(f"{threshold:.1f}" for threshold in thresholds_tried),
+        f"Selected positive residual threshold: {selected_threshold:.1f}",
+        f"Residual threshold relaxation: {threshold_note}",
+        f"Generated exploration rows: {generated_explore_count}",
+        f"BO fallback exploration rows: {fallback_explore_count}",
+        (
+            "Generated anchor stage range: "
+            f"{generated_anchor_stage_range[0]} to {generated_anchor_stage_range[1]}"
+            if generated_anchor_stage_range
+            else "Generated anchor stage range: none"
+        ),
+        (
+            "Generated anchor stage counts: "
+            + ", ".join(f"stage {stage}={count}" for stage, count in generated_anchor_stage_counts.items())
+            if generated_anchor_stage_counts
+            else "Generated anchor stage counts: none"
+        ),
+        "Blind-spot signal: historical positive residuals with recency/support adjustment",
+        "Novelty score: full wet-lab history coverage, kept separate from blind-spot support",
+        "Exploration anchors may come from any historical positive-residual stage",
         f"Top blind-spot features: {', '.join(top_features) if top_features else 'none detected'}",
         f"Top blind-spot pairs: {', '.join(top_pairs) if top_pairs else 'none detected'}",
         "",
@@ -1139,6 +1550,8 @@ def preflight_report(
     previous_batch: pd.DataFrame,
     candidate_paths: Sequence[Path],
     optimizer: BayesianOptimizer,
+    exploration_audit: Dict[str, object],
+    blindspot_audit: Dict[str, object],
 ) -> Dict:
     """Build the machine-readable input validation report."""
     return {
@@ -1159,6 +1572,29 @@ def preflight_report(
         "effective_max_ingredients": int(optimizer.effective_max_ingredients),
         "dmso_cap_percent": float(optimizer.config.max_dmso_percent),
         "feature_names": list(active_stage.feature_names),
+        "positive_residual_thresholds_tried": list(exploration_audit["positive_residual_thresholds_tried"]),
+        "selected_positive_residual_threshold": float(exploration_audit["selected_positive_residual_threshold"]),
+        "anchor_count_at_selected_threshold": int(exploration_audit["anchor_count_at_selected_threshold"]),
+        "generated_pool_rows_at_selected_threshold": int(
+            exploration_audit["generated_pool_rows_at_selected_threshold"]
+        ),
+        "generated_explore_count": int(exploration_audit["generated_explore_count"]),
+        "fallback_explore_count": int(exploration_audit["fallback_explore_count"]),
+        "generated_anchor_stage_counts": dict(exploration_audit.get("generated_anchor_stage_counts", {})),
+        "generated_anchor_stage_range": list(exploration_audit.get("generated_anchor_stage_range", [])),
+        "generated_top_anchor_pairs": list(exploration_audit.get("generated_top_anchor_pairs", [])),
+        "positive_residual_threshold_attempts": list(exploration_audit["positive_residual_threshold_attempts"]),
+        "blindspot_signal_mode": str(blindspot_audit["blindspot_signal_mode"]),
+        "blindspot_stage_range": list(blindspot_audit["blindspot_stage_range"]),
+        "blindspot_recency_decay": float(blindspot_audit["blindspot_recency_decay"]),
+        "blindspot_region_prediction_threshold": float(blindspot_audit["blindspot_region_prediction_threshold"]),
+        "blindspot_region_weight": float(blindspot_audit["blindspot_region_weight"]),
+        "blindspot_support_experiment_min": int(blindspot_audit["blindspot_support_experiment_min"]),
+        "blindspot_experiment_shrink_offset": float(blindspot_audit["blindspot_experiment_shrink_offset"]),
+        "blindspot_batch_shrink_offset": float(blindspot_audit["blindspot_batch_shrink_offset"]),
+        "historical_positive_residual_rows": int(blindspot_audit["historical_positive_residual_rows"]),
+        "top_positive_features": list(blindspot_audit["top_positive_features"]),
+        "top_positive_pairs": list(blindspot_audit["top_positive_pairs"]),
     }
 
 
@@ -1257,36 +1693,46 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
             f"found {last_completed_stage}."
         )
 
-    previous_stage = load_stage_artifacts(last_completed_stage)
+    previous_stage = load_stage_artifacts(last_completed_stage, require_observed_context=False)
     if previous_stage.feature_names != active_stage.feature_names:
         raise ValidationError("Active and previous-stage feature spaces do not match.")
 
     previous_batch = compute_previous_stage_batch(validation_df, previous_stage)
+    historical_residual_df = build_historical_residual_df(validation_df, active_stage, completed_stages)
     optimizer = build_bo_context(active_stage)
     candidate_pool, candidate_paths = load_bo_candidate_pool(active_stage, validation_df)
     tested_signatures = build_tested_signatures(validation_df, active_stage.feature_names)
 
-    feature_signal, pair_signal, wetlab_feature_counts, wetlab_pair_counts = compute_blindspot_signals(
-        previous_batch,
+    (
+        feature_signal,
+        pair_signal,
+        wetlab_feature_counts,
+        wetlab_pair_counts,
+        _feature_details,
+        _pair_details,
+        blindspot_audit,
+    ) = compute_blindspot_signals(
+        historical_residual_df,
         validation_df,
         active_stage.feature_names,
+        last_completed_stage,
     )
 
     exploit_rows = build_exploitation_selection(candidate_pool)
     if len(exploit_rows) != EXPLOIT_COUNT:
         raise ValidationError(f"Unable to select {EXPLOIT_COUNT} exploitation rows from active BO candidates.")
 
-    generated_pool = build_generated_probe_pool(
+    exploit_signatures = {str(row["signature"]) for row in exploit_rows}
+    generated_selection = choose_generated_exploration_rows(
         active_stage,
-        previous_stage,
-        previous_batch,
-        validation_df,
+        historical_residual_df,
         optimizer,
         feature_signal,
         pair_signal,
         wetlab_feature_counts,
         wetlab_pair_counts,
         tested_signatures,
+        exploit_signatures,
     )
     fallback_pool = build_bo_exploration_fallback_pool(
         candidate_pool,
@@ -1297,11 +1743,15 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         wetlab_pair_counts,
     )
 
-    exploit_signatures = {str(row["signature"]) for row in exploit_rows}
-    explore_rows = build_exploration_selection(generated_pool, fallback_pool, exploit_signatures)
+    explore_rows, fallback_explore_count = build_exploration_selection(
+        generated_selection["selected_rows"],
+        fallback_pool,
+        exploit_signatures,
+    )
     if len(explore_rows) != EXPLORE_COUNT:
         raise ValidationError(f"Unable to select {EXPLORE_COUNT} exploration rows.")
-    ensure_dmso_probe_present(explore_rows)
+    exploration_audit = dict(generated_selection["audit"])
+    exploration_audit["fallback_explore_count"] = int(fallback_explore_count)
 
     output_rows = to_output_rows(active_stage, exploit_rows, explore_rows)
     validate_output_rows(output_rows, active_stage, optimizer, tested_signatures)
@@ -1317,6 +1767,8 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         previous_batch,
         candidate_paths,
         optimizer,
+        exploration_audit,
+        blindspot_audit,
     )
 
     summary_text = build_summary_text(
@@ -1326,6 +1778,8 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         [dict(row) for row in output_rows if row["recommendation_type"] == "explore"],
         feature_signal,
         pair_signal,
+        exploration_audit,
+        blindspot_audit,
     )
     metadata = {
         "target_stage": active_stage.stage,
@@ -1333,7 +1787,17 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         "feedback_stage": previous_stage.stage,
         "feedback_iteration_dir": previous_stage.iteration_dir,
         "generation_seed": GENERATION_SEED,
-        "min_positive_residual": MIN_POSITIVE_RESIDUAL,
+        "positive_residual_thresholds_tried": list(exploration_audit["positive_residual_thresholds_tried"]),
+        "selected_positive_residual_threshold": float(exploration_audit["selected_positive_residual_threshold"]),
+        "anchor_count_at_selected_threshold": int(exploration_audit["anchor_count_at_selected_threshold"]),
+        "generated_pool_rows_at_selected_threshold": int(
+            exploration_audit["generated_pool_rows_at_selected_threshold"]
+        ),
+        "generated_explore_count": int(exploration_audit["generated_explore_count"]),
+        "fallback_explore_count": int(exploration_audit["fallback_explore_count"]),
+        "generated_anchor_stage_counts": dict(exploration_audit.get("generated_anchor_stage_counts", {})),
+        "generated_anchor_stage_range": list(exploration_audit.get("generated_anchor_stage_range", [])),
+        "generated_top_anchor_pairs": list(exploration_audit.get("generated_top_anchor_pairs", [])),
         "meaningful_actual_min": MEANINGFUL_ACTUAL_MIN,
         "min_exploration_prediction": MIN_EXPLORATION_PREDICTION,
         "exploit_count": EXPLOIT_COUNT,
@@ -1341,20 +1805,18 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         "effective_max_ingredients": int(optimizer.effective_max_ingredients),
         "dmso_cap_percent": float(optimizer.config.max_dmso_percent),
         "candidate_files": [str(path.relative_to(PROJECT_ROOT)) for path in candidate_paths],
-        "used_exploration_fallback": any(row["origin"] == "explore_fallback" for row in output_rows),
-        "top_positive_features": [
-            {"feature": feature_name, "score": round_or_none(score)}
-            for feature_name, score in sorted(feature_signal.items(), key=lambda item: item[1], reverse=True)
-            if score > 0.0
-        ][:10],
-        "top_positive_pairs": [
-            {
-                "pair": list(pair),
-                "score": round_or_none(score),
-            }
-            for pair, score in sorted(pair_signal.items(), key=lambda item: item[1], reverse=True)
-            if score > 0.0
-        ][:10],
+        "used_exploration_fallback": bool(exploration_audit["fallback_explore_count"]),
+        "blindspot_signal_mode": str(blindspot_audit["blindspot_signal_mode"]),
+        "blindspot_stage_range": list(blindspot_audit["blindspot_stage_range"]),
+        "blindspot_recency_decay": float(blindspot_audit["blindspot_recency_decay"]),
+        "blindspot_region_prediction_threshold": float(blindspot_audit["blindspot_region_prediction_threshold"]),
+        "blindspot_region_weight": float(blindspot_audit["blindspot_region_weight"]),
+        "blindspot_support_experiment_min": int(blindspot_audit["blindspot_support_experiment_min"]),
+        "blindspot_experiment_shrink_offset": float(blindspot_audit["blindspot_experiment_shrink_offset"]),
+        "blindspot_batch_shrink_offset": float(blindspot_audit["blindspot_batch_shrink_offset"]),
+        "historical_positive_residual_rows": int(blindspot_audit["historical_positive_residual_rows"]),
+        "top_positive_features": list(blindspot_audit["top_positive_features"]),
+        "top_positive_pairs": list(blindspot_audit["top_positive_pairs"]),
     }
 
     output_df = pd.DataFrame(output_rows)

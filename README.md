@@ -75,7 +75,9 @@ The snapshot dated 2026-03-16 uses the composite prior-mean correction checkpoin
 | Median wet-lab viability | 35.08% |
 | Wet-lab runs at or above 50% viability | 14 |
 
-This snapshot still highlights the ectoin + ethylene glycol ridge, but the newest iteration-3 wet-lab batch also exposed a DMSO + sucrose blind spot that now feeds the next-batch calibration workflow in `07_next_formulations`.
+This snapshot still highlights the ectoin + ethylene glycol ridge, while the
+residual-driven `07_next_formulations` step now adapts to whichever blind spots
+are actually present in the latest completed wet-lab batch.
 
 ## Active Model and Iterations
 
@@ -120,9 +122,11 @@ python src/07_next_formulations/next_formulations.py
 This script:
 - resolves the active iteration automatically
 - requires the latest completed wet-lab stage to be the immediately previous stage
-- uses `05` BO outputs for 5 exploitation picks
-- generates 5 calibration probes from positive-residual blind spots in the latest completed batch
-- validates inputs before generation and validates all 10 outputs again before writing
+- uses `05` BO outputs for 10 exploitation picks
+- adaptively relaxes the positive-residual anchor threshold when stronger anchors are unavailable
+- keeps generated residual probes ahead of BO fallback when filling the 10 exploration slots
+- allows exploration probes to anchor from any historical positive-residual wet-lab stage
+- validates inputs before generation and validates all 20 outputs again before writing
 
 Outputs for the current active stage live in:
 - `results/next_formulations/iteration_4_prior_mean/next_formulations.csv`
@@ -130,7 +134,10 @@ Outputs for the current active stage live in:
 - `results/next_formulations/iteration_4_prior_mean/next_formulations_metadata.json`
 - `results/next_formulations/iteration_4_prior_mean/input_validation.json`
 
-Current exploration highlights include a generated `528.0mM dmso + 100.0mM sucrose` midpoint probe, which is there specifically to improve model calibration around the DMSO + sucrose blind spot exposed by `EXP3107` and `EXP3108`.
+The summary and metadata artifacts now record which positive-residual thresholds
+were tried, which threshold was selected, how many exploration rows came
+from generated probes versus BO fallback, and which historical anchor stages
+fed the generated probes.
 
 ### Stage-Based Evaluation
 
