@@ -28,7 +28,10 @@ _helper_dir = os.path.join(os.path.dirname(_script_dir), 'helper')
 if _helper_dir not in sys.path:
     sys.path.insert(0, _helper_dir)
 from active_model_resolver import ModelResolutionError, resolve_active_model  # noqa: E402
-from formulation_formatting import format_formulation  # noqa: E402
+from formulation_formatting import (  # noqa: E402
+    format_formulation,
+    normalize_formulation_vector,
+)
 from observed_context import load_observed_context  # noqa: E402
 
 # =============================================================================
@@ -202,6 +205,10 @@ class FormulationOptimizer:
         self.bounds = self._get_feature_bounds()
         
         np.random.seed(self.config.random_seed)
+
+    def _apply_practical_floor(self, x: np.ndarray) -> np.ndarray:
+        """Zero trace ingredients that should count as operationally absent."""
+        return normalize_formulation_vector(x, self.feature_names)
     
     def _get_feature_bounds(self) -> List[Tuple[float, float]]:
         """Get bounds for each feature based on typical concentration ranges."""
@@ -235,7 +242,8 @@ class FormulationOptimizer:
         
         Maximizes: viability - penalties
         """
-        x_reshaped = x.reshape(1, -1)
+        x_eval = self._apply_practical_floor(np.asarray(x, dtype=float))
+        x_reshaped = x_eval.reshape(1, -1)
         
         # Get prediction
         if self.is_composite:
@@ -256,8 +264,8 @@ class FormulationOptimizer:
         
         # Apply penalties
         penalty = 0.0
-        penalty += dmso_penalty(x, self.dmso_index, self.max_dmso_molar)
-        penalty += ingredient_count_penalty(x, self.config.max_ingredients)
+        penalty += dmso_penalty(x_eval, self.dmso_index, self.max_dmso_molar)
+        penalty += ingredient_count_penalty(x_eval, self.config.max_ingredients)
         
         # Return negative (for minimization)
         return -(acq - penalty)
@@ -278,8 +286,8 @@ class FormulationOptimizer:
         for idx in selected_indices:
             low, high = self.bounds[idx]
             x[idx] = np.random.uniform(low, high)
-        
-        return x
+
+        return self._apply_practical_floor(x)
     
     def optimize(self, X_observed: np.ndarray, y_observed: np.ndarray,
                  n_candidates: int = None) -> pd.DataFrame:
@@ -315,7 +323,7 @@ class FormulationOptimizer:
         print(f"Generating {n_samples} random formulations...")
         
         for i in range(n_samples):
-            x = self._generate_random_candidate()
+            x = self._apply_practical_floor(self._generate_random_candidate())
             
             # Skip if too many ingredients
             n_ing = count_ingredients(x)
@@ -356,7 +364,7 @@ class FormulationOptimizer:
             # Fallback: generate at least some candidates without constraints
             print("Warning: No valid candidates, relaxing constraints...")
             for i in range(n_candidates):
-                x = self._generate_random_candidate()
+                x = self._apply_practical_floor(self._generate_random_candidate())
                 x_reshaped = x.reshape(1, -1)
                 if self.is_composite:
                     pred_mean, pred_std = self.gp.predict(x_reshaped, return_std=True)
@@ -390,7 +398,7 @@ class FormulationOptimizer:
             }
             
             # Add ingredient concentrations
-            x = c['formulation']
+            x = self._apply_practical_floor(c['formulation'])
             for j, name in enumerate(self.feature_names):
                 if x[j] > 1e-6:
                     row[name] = x[j]

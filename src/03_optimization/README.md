@@ -33,6 +33,15 @@ The script uses the shared active-model resolver that is also used by `05_bo_opt
 - `results/candidates_dmso_free_<iteration_tag>.csv` - Low-DMSO candidates (`<0.5%` DMSO)
 - `*_summary.txt` - Human-readable summaries saved alongside the CSVs
 
+Before candidates are scored and exported, `03` applies the same practical
+concentration floor used elsewhere in the pipeline:
+
+- `_pct` values `<0.1%` are zeroed
+- `_M` values `<0.001 M` (`<1.0 mM`) are zeroed
+
+This keeps trace ingredients from inflating `n_ingredients` or surviving into
+candidate identity/output text.
+
 `<iteration_tag>` comes from the resolved active model identity, for example:
 - `iteration_1`
 - `iteration_3_weighted_simple`
@@ -44,10 +53,11 @@ The script uses the shared active-model resolver that is also used by `05_bo_opt
 2. Load the exact artifacts for the selected iteration
 3. Load the active observed context (literature + wet lab rows)
 4. Generate large pool of random formulations (50× target count)
-5. Filter by constraints (max DMSO, max ingredients)
-6. Use model to predict viability for each candidate
-7. Rank by predicted viability (highest mean)
-8. Select top-N candidates
+5. Apply the practical concentration floor to zero trace ingredients
+6. Filter by constraints (max DMSO, max ingredients)
+7. Use model to predict viability for each candidate
+8. Rank by predicted viability (highest mean)
+9. Select top-N candidates
 
 ### Constraints
 
