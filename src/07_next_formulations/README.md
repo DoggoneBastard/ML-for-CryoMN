@@ -151,4 +151,4 @@ This module fails hard on:
 - violations of BO bounds, DMSO cap, or effective ingredient-count limits
 
 If the run succeeds, `input_validation.json` records exactly which inputs were
-used so future runs can be audited.
+used so repeated runs can be audited.

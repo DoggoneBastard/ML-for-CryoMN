@@ -75,7 +75,7 @@ The snapshot dated 2026-03-16 uses the composite prior-mean correction checkpoin
 | Median wet-lab viability | 35.08% |
 | Wet-lab runs at or above 50% viability | 14 |
 
-The snapshot still highlights the ectoin + ethylene glycol ridge, while the
+The snapshot highlights the ectoin + ethylene glycol ridge, while the
 residual-driven `07_next_formulations` step adapts to the blind spots exposed
 by completed wet-lab stages.
 
@@ -187,8 +187,9 @@ Outputs:
 - `results/evaluation/next_formulations_performance.png`
 
 Candidate-hit matching in `06_evaluation_explainability` uses the same
-practical concentration floor, so frozen candidate rows still count as later
-hits when the only difference is a trace ingredient below `0.1%` or `1.0 mM`.
+practical concentration floor, so frozen candidate rows count as hits in
+subsequent wet-lab stages when the only difference is a trace ingredient below
+`0.1%` or `1.0 mM`.
 
 Stage-level metrics from the saved evaluation artifacts:
 
@@ -204,8 +205,8 @@ Stage-level metrics from the saved evaluation artifacts:
 Interpretation:
 
 - absolute error improved substantially from literature-only to iteration 2
-- rank ordering is still weak, especially for literature-only and iteration 1
-- iteration 3 is a better ranker than iteration 2, but still a weak calibrated predictor
+- rank ordering remains weak, especially for literature-only and iteration 1
+- iteration 3 ranks better than iteration 2, but remains a weak calibrated predictor
 - `07_next_formulations` uses stage residuals plus BO outputs to choose a mixed exploit/explore wet-lab batch
 
 ![Stage Performance](results/evaluation/stage_performance.png)
@@ -214,11 +215,11 @@ Interpretation:
 
 ## Model Explainability
 
-Understanding which ingredients drive cell viability predictions is crucial for guiding wet lab experiments. The explainability module now renders a support-aware visual suite: contour-style figures preserve the BO aesthetic, observed literature and wet-lab support are shown directly, and stronger-support regions are indicated with boundaries instead of masking the surfaces.
+Understanding which ingredients drive cell viability predictions is crucial for guiding wet lab experiments. The explainability module renders a support-aware visual suite: contour-style figures preserve the BO aesthetic, observed literature and wet-lab support are shown directly, and stronger-support regions are indicated with boundaries instead of masking the surfaces.
 
 ### Explainability Outputs (`iteration_5_prior_mean`)
 
-The explainability outputs shown here live in `results/explainability/iteration_5_prior_mean/`. The current suite emphasizes top drivers such as `ethylene_glycol`, `dmso`, `ectoin`, `fbs`, and `hsa`, while making the support envelope explicit.
+The explainability outputs shown here live in `results/explainability/iteration_5_prior_mean/`. The suite emphasizes top drivers such as `ethylene_glycol`, `dmso`, `ectoin`, `fbs`, and `hsa`, while making the support envelope explicit.
 
 #### SHAP Summary
 
@@ -244,7 +245,7 @@ Visualizing how pairs of top ingredients interact to affect viability, with obse
 
 ![Interaction Contours](results/explainability/iteration_5_prior_mean/interaction_contours.png)
 
-Across the support-aware figures, the dashed white boundary marks the stronger pairwise support envelope inferred from observed formulations. Inside that boundary, the surface is better anchored by observed data; outside it, the same surface is still rendered for continuity but should be read as more extrapolative.
+Across the support-aware figures, the dashed white boundary marks the stronger pairwise support envelope inferred from observed formulations. Inside that boundary, the surface is better anchored by observed data; outside it, the same surface is rendered for continuity but should be read as more extrapolative.
 
 #### Uncertainty Analysis
 

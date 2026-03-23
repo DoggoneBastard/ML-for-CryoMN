@@ -68,7 +68,7 @@ python src/04_validation_loop/update_model_weighted_prior.py
 
 ### Evaluate Model Stages Against Wet-Lab Batches
 
-Stage-based scoring was moved into `06_evaluation_explainability` so the
+Stage-based scoring is handled in `06_evaluation_explainability` so the
 post-update analysis lives in one place:
 
 ```bash
@@ -115,7 +115,7 @@ It:
 - writes comparison artifacts under `results/model_comparison/`
 - produces `recommended_method.json` with either `switch`, `keep_incumbent`, or `no_switch`
 
-The update scripts here still train on raw wet-lab numeric concentrations. The
+The update scripts train on raw wet-lab numeric concentrations. The
 practical concentration floor used by `05`, `06`, and `07` changes candidate
 generation and formulation identity matching, not the retraining inputs.
 

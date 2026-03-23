@@ -71,7 +71,7 @@ These BO outputs are also the BO source pool consumed by
    - DE starts from warm starts around top observed formulations instead of a blind search only
    - Each DE generation is scored as a batch, so model inference and penalty evaluation are applied to the full population together
    - the practical concentration floor is applied before sparsification and prediction
-   - **Batch diversity**: Gaussian penalty repels DE away from previously found candidates
+   - **Batch diversity**: Gaussian penalty repels DE away from already selected candidates
    - Constraint violations (DMSO, ingredient count, distance from observed support) are penalized
    - Exact duplicates are skipped
 7. Recalculate pure UCB (without penalty) for accurate reporting
@@ -80,7 +80,7 @@ These BO outputs are also the BO source pool consumed by
 
 ### Batch Diversity (Local Penalization)
 
-To prevent all candidates from converging to the same optimum, each DE run adds a Gaussian repulsion centered on previously found candidates:
+To prevent all candidates from converging to the same optimum, each DE run adds a Gaussian repulsion centered on already selected candidates:
 
 ```
 penalty(x) = Σ_i  strength · exp(-0.5 · ||x - x_i||² / r²)
@@ -104,7 +104,7 @@ Where:
 **Why UCB instead of EI?**
 In high-dimensional spaces (e.g., 21 ingredients) with limited data, almost the entire formulation space is "out-of-distribution" (the void). In the void, the model reverts to its prior mean (~27.5%) with maximum uncertainty (~24%). 
 
-Because EI mathematically rewards pure uncertainty, an EI-driven optimizer will actively dive into the flat void rather than staying near known good recipes. UCB (with a tuned `kappa`) places proportional weight on the *predicted mean*, anchoring the optimizer to known high-performing peaks while still exploring slightly uncertain edges.
+Because EI mathematically rewards pure uncertainty, an EI-driven optimizer will actively dive into the flat void rather than staying near known good recipes. UCB (with a tuned `kappa`) places proportional weight on the *predicted mean*, anchoring the optimizer to known high-performing peaks while exploring slightly uncertain edges.
 
 ### Wet-Lab Exploitation
 

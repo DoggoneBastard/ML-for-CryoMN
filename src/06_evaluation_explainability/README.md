@@ -80,7 +80,7 @@ Candidate-hit matching uses the same practical concentration floor as `05` and
 - `_pct` values `<0.1%` are treated as absent
 - `_M` values `<0.001 M` (`<1.0 mM`) are treated as absent
 
-This means a frozen candidate row can still count as a later wet-lab hit when
+This means a frozen candidate row can count as a wet-lab hit in subsequent stages when
 the only difference is a trace ingredient that should effectively be zero.
 
 Additional evaluation outputs:
@@ -88,7 +88,7 @@ Additional evaluation outputs:
 - `results/evaluation/next_formulations_performance.png`
 
 The recommendation-slate audit rescales the saved `07` rows with the frozen
-stage model inside `06`, then compares them with later wet-lab measurements.
+stage model inside `06`, then compares them with subsequent wet-lab measurements.
 It reports:
 
 - overall `07` slate performance
@@ -111,7 +111,7 @@ If no explicit iteration metadata exists, the fallback directory is:
 
 - `results/explainability/active_model/`
 
-The explainability suite is now intentionally support-aware:
+The explainability suite is intentionally support-aware:
 
 - slice and contour axes default to observed quantile bounds instead of raw extrema
 - observed literature and wet-lab rows are overlaid wherever support matters
@@ -122,7 +122,7 @@ Support cues:
 
 - In `partial_dependence_plots.png`, dashed curve segments indicate the same empirical slice continued outside stronger local 1D support.
 - In `interaction_contours.png` and `acquisition_landscape.png`, the dashed white boundary marks the stronger pairwise support envelope estimated from observed formulations.
-- Inside that dashed boundary, the surface is better grounded in observed data. Outside it, the surface is still shown for continuity, but should be interpreted as more extrapolative.
+- Inside that dashed boundary, the surface is better grounded in observed data. Outside it, the surface is shown for continuity, but should be interpreted as more extrapolative.
 - In `feature_importance.png`, the vertical dashed line is only a visual dominance cutoff to separate the strongest features from the long tail; it is not a hard statistical threshold.
 - In `shap_summary.png`, only the top features are shown. Color encodes feature value and horizontal spread shows directional contribution magnitude across observed formulations.
 
@@ -150,7 +150,7 @@ settings and static penalties, but it does not include sequential
 batch-diversity effects that depend on already-selected candidates.
 
 > `shap` is optional. If it is not installed, the SHAP plots are skipped while
-> the other explainability outputs still run.
+> the other explainability outputs run.
 
 ## Feature Name Handling
 
