@@ -19,7 +19,7 @@
             box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
             padding: 40px;
             display: inline-block;
-            min-width: 1000px;
+            min-width: 800px;
         }
 
         h1 {
@@ -64,10 +64,10 @@ flowchart TD
     
     subgraph ProjectArch ["📦 ML for CryoMN Project"]
         direction LR
-        D["Data Parsing<br/>(01)"] --> M["GP Model<br/>(02)"]
+        D["Data Parsing<br/>(01)"] --> M["Initial GP Model<br/>(02)"]
         M --> O["Optimization<br/>(03, 05)"]
         O --> V["Validation<br/>(04)"]
-        V -.-> D
+        V -.-> O
     end
 
     Claude --- Step3 --> ProjectArch
