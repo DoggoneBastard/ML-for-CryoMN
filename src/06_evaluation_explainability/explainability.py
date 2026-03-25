@@ -20,6 +20,7 @@ Date: 2026-01-27
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import tempfile
@@ -122,19 +123,68 @@ class ExplainabilityConfig:
     bo_support_radius_scale: float = BOConfig.support_radius_scale
     bo_sparsity_penalty: float = BOConfig.sparsity_penalty
 
-    cmap_viability: str = 'RdYlGn'
-    cmap_uncertainty: str = 'YlOrRd'
+    cmap_viability: str = 'magma'
+    cmap_uncertainty: str = 'cividis'
     cmap_acquisition: str = 'viridis'
+    cmap_feature_importance: str = 'magma'
     line_primary: str = '#0b5d7a'
     line_secondary: str = '#2e8b57'
-    color_literature: str = '#6a7f8f'
-    color_wetlab: str = '#d55d3e'
+    color_literature: str = '#0072b2'
+    color_wetlab: str = '#e69f00'
+    marker_literature: str = 'o'
+    marker_wetlab: str = '^'
     support_fill: str = '#cfd8df'
-    contour_line_dark: str = '#22303c'
+    contour_line_dark: str = '#000000'
     contour_line_light: str = '#ffffff'
+    uncertainty_scatter_alpha_for_colorbar: float = 0.8
+    support_scatter_alpha_for_colorbar: float = 0.8
     support_diagnostic_legend_scale: float = 1.5
     interaction_min_axis_balance: float = 0.10
     interaction_min_occupied_bins: int = 4
+
+
+def apply_palette_profile(config: ExplainabilityConfig, profile: str):
+    """Apply palette settings for either accessibility-first or legacy styling."""
+    normalized = profile.strip().lower()
+    if normalized == 'colorblind':
+        config.cmap_viability = 'magma'
+        config.cmap_uncertainty = 'cividis'
+        config.cmap_acquisition = 'viridis'
+        config.cmap_feature_importance = 'magma'
+        config.color_literature = '#0072b2'
+        config.color_wetlab = '#e69f00'
+        config.marker_literature = 'o'
+        config.marker_wetlab = '^'
+        config.contour_line_dark = '#000000'
+        return
+
+    if normalized == 'legacy':
+        config.cmap_viability = 'RdYlGn'
+        config.cmap_uncertainty = 'YlOrRd'
+        config.cmap_acquisition = 'viridis'
+        config.cmap_feature_importance = 'RdYlGn'
+        config.color_literature = '#6a7f8f'
+        config.color_wetlab = '#d55d3e'
+        config.marker_literature = 'o'
+        config.marker_wetlab = 'o'
+        config.contour_line_dark = '#22303c'
+        return
+
+    raise ValueError(f"Unsupported palette profile: {profile}")
+
+
+def parse_args(argv: Optional[Sequence[str]] = None):
+    """Parse CLI arguments for explainability report generation."""
+    parser = argparse.ArgumentParser(
+        description='Generate explainability artifacts for the active CryoMN model.'
+    )
+    parser.add_argument(
+        '--palette-profile',
+        choices=('colorblind', 'legacy'),
+        default='colorblind',
+        help='Choose color palette profile for explainability figures.',
+    )
+    return parser.parse_args(argv)
 
 
 def load_model_and_data(project_root: str):
@@ -259,9 +309,9 @@ def source_masks(df: pd.DataFrame) -> Dict[str, np.ndarray]:
 def source_legend_handles(config: ExplainabilityConfig, edge_color: str = 'white') -> List[Line2D]:
     """Legend handles for literature / wet-lab point overlays."""
     return [
-        Line2D([0], [0], marker='o', color='none', markerfacecolor=config.color_literature,
+        Line2D([0], [0], marker=config.marker_literature, color='none', markerfacecolor=config.color_literature,
                markeredgecolor=edge_color, markeredgewidth=0.5, label='Literature', markersize=7, alpha=0.55),
-        Line2D([0], [0], marker='o', color='none', markerfacecolor=config.color_wetlab,
+        Line2D([0], [0], marker=config.marker_wetlab, color='none', markerfacecolor=config.color_wetlab,
                markeredgecolor=edge_color, markeredgewidth=0.6, label='Wet Lab', markersize=8, alpha=0.95),
     ]
 
@@ -271,10 +321,10 @@ def alpha_legend_handles(config: ExplainabilityConfig, base_color: Optional[str]
     """Legend handles for plots that distinguish sources by alpha rather than color."""
     color = base_color or config.line_primary
     return [
-        Line2D([0], [0], marker='o', color='none', markerfacecolor=color,
+        Line2D([0], [0], marker=config.marker_literature, color='none', markerfacecolor=color,
                markeredgecolor='white', markeredgewidth=0.5, label='Literature',
                markersize=7 * marker_scale, alpha=0.20),
-        Line2D([0], [0], marker='o', color='none', markerfacecolor=color,
+        Line2D([0], [0], marker=config.marker_wetlab, color='none', markerfacecolor=color,
                markeredgecolor='white', markeredgewidth=0.6, label='Wet Lab',
                markersize=8 * marker_scale, alpha=0.95),
     ]
@@ -314,25 +364,55 @@ def relative_luminance(color: Tuple[float, float, float, float] | Tuple[float, f
     return float(np.dot(linear, np.array([0.2126, 0.7152, 0.0722])))
 
 
-def choose_contour_line_color(surface: np.ndarray, cmap_name: str,
-                              config: ExplainabilityConfig) -> str:
-    """Choose white or dark contour overlays from the underlying surface brightness."""
+def contrast_ratio(luminance_a: float, luminance_b: float) -> float:
+    """Return WCAG contrast ratio between two relative luminance values."""
+    lighter = max(float(luminance_a), float(luminance_b))
+    darker = min(float(luminance_a), float(luminance_b))
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def estimate_surface_luminance(surface: np.ndarray, cmap_name: str,
+                               vmin: Optional[float] = None,
+                               vmax: Optional[float] = None) -> Optional[float]:
+    """Estimate representative background luminance for a scalar surface."""
     finite = np.asarray(surface, dtype=float)
     finite = finite[np.isfinite(finite)]
     if finite.size == 0:
-        return config.contour_line_dark
+        return None
 
-    if np.isclose(finite.min(), finite.max()):
+    if vmin is None:
+        vmin = float(finite.min())
+    if vmax is None:
+        vmax = float(finite.max())
+    if np.isclose(vmax, vmin):
         sample_positions = np.array([0.5], dtype=float)
     else:
         sample_values = np.quantile(finite, [0.2, 0.5, 0.8])
-        sample_positions = (sample_values - finite.min()) / (finite.max() - finite.min())
+        sample_positions = np.clip((sample_values - vmin) / (vmax - vmin), 0.0, 1.0)
 
     cmap = plt.get_cmap(cmap_name)
-    luminance = np.mean([relative_luminance(cmap(float(pos))) for pos in sample_positions])
-    if luminance < 0.42:
-        return config.contour_line_light
-    return config.contour_line_dark
+    return float(np.mean([relative_luminance(cmap(float(pos))) for pos in sample_positions]))
+
+
+def choose_contrasting_surface_color(background_luminance: float,
+                                     config: ExplainabilityConfig) -> str:
+    """Choose dark/light overlay color with the better contrast ratio."""
+    dark_lum = relative_luminance(config.contour_line_dark)
+    light_lum = relative_luminance(config.contour_line_light)
+    dark_ratio = contrast_ratio(background_luminance, dark_lum)
+    light_ratio = contrast_ratio(background_luminance, light_lum)
+    if dark_ratio >= light_ratio:
+        return config.contour_line_dark
+    return config.contour_line_light
+
+
+def choose_contour_line_color(surface: np.ndarray, cmap_name: str,
+                              config: ExplainabilityConfig) -> str:
+    """Choose white or dark contour overlays from the underlying surface brightness."""
+    luminance = estimate_surface_luminance(surface, cmap_name)
+    if luminance is None:
+        return config.contour_line_dark
+    return choose_contrasting_surface_color(luminance, config)
 
 
 def choose_foreground_color_for_surface(surface: np.ndarray, cmap_name: str,
@@ -348,7 +428,18 @@ def choose_foreground_color_for_surface(surface: np.ndarray, cmap_name: str,
     row_slice = slice(0, row_extent) if 'upper' in loc else slice(array.shape[0] - row_extent, array.shape[0])
     col_slice = slice(array.shape[1] - col_extent, array.shape[1]) if 'right' in loc else slice(0, col_extent)
     local_surface = array[row_slice, col_slice]
-    return choose_contour_line_color(local_surface, cmap_name, config)
+    global_finite = array[np.isfinite(array)]
+    if global_finite.size == 0:
+        return config.contour_line_dark
+    local_luminance = estimate_surface_luminance(
+        local_surface,
+        cmap_name,
+        vmin=float(global_finite.min()),
+        vmax=float(global_finite.max()),
+    )
+    if local_luminance is None:
+        return config.contour_line_dark
+    return choose_contrasting_surface_color(local_luminance, config)
 
 
 def style_legend_for_surface(legend, surface: np.ndarray, cmap_name: str,
@@ -510,6 +601,7 @@ def overlay_source_points(ax: plt.Axes, x: np.ndarray, y: np.ndarray, source_df:
             x[masks['literature']],
             y[masks['literature']],
             c=config.color_literature,
+            marker=config.marker_literature,
             s=56,
             alpha=alpha_literature,
             edgecolors='white',
@@ -521,6 +613,7 @@ def overlay_source_points(ax: plt.Axes, x: np.ndarray, y: np.ndarray, source_df:
             x[masks['wetlab']],
             y[masks['wetlab']],
             c=config.color_wetlab,
+            marker=config.marker_wetlab,
             s=84,
             alpha=alpha_wetlab,
             edgecolors='white',
@@ -696,7 +789,8 @@ def plot_feature_importance(importance_df: pd.DataFrame, output_dir: str,
     values = display['importance'].to_numpy(dtype=float)
 
     fig, ax = plt.subplots(figsize=config.figsize_medium)
-    colors = plt.cm.RdYlGn(np.linspace(0.25, 0.85, len(display)))
+    cmap = plt.get_cmap(config.cmap_feature_importance)
+    colors = cmap(np.linspace(0.25, 0.85, len(display)))
     bars = ax.barh(range(len(display)), values, color=colors, edgecolor='white', linewidth=1.0, zorder=3)
 
     ax.set_yticks(range(len(display)))
@@ -1078,13 +1172,17 @@ def plot_uncertainty_analysis(model, scaler, X: np.ndarray, y: np.ndarray,
     ax.plot([0, 100], [0, 100], linestyle='--', color='#4a5966', alpha=0.7, linewidth=2)
     if masks['literature'].any():
         sc = ax.scatter(y[masks['literature']], y_pred[masks['literature']], c=y_std[masks['literature']],
-                        cmap=config.cmap_uncertainty, s=40, alpha=0.20, edgecolors='white', linewidths=0.35)
+                        cmap=config.cmap_uncertainty, marker=config.marker_literature, s=40,
+                        alpha=config.uncertainty_scatter_alpha_for_colorbar,
+                        edgecolors='white', linewidths=0.35)
     else:
-        sc = ax.scatter(y, y_pred, c=y_std, cmap=config.cmap_uncertainty, s=36, alpha=0.5,
+        sc = ax.scatter(y, y_pred, c=y_std, cmap=config.cmap_uncertainty, s=36,
+                        alpha=config.uncertainty_scatter_alpha_for_colorbar,
                         edgecolors='white', linewidths=0.35)
     if masks['wetlab'].any():
         ax.scatter(y[masks['wetlab']], y_pred[masks['wetlab']], c=y_std[masks['wetlab']],
-                   cmap=config.cmap_uncertainty, s=80, alpha=0.95, edgecolors='white', linewidths=0.55)
+                   cmap=config.cmap_uncertainty, marker=config.marker_wetlab, s=80, alpha=0.95,
+                   edgecolors='white', linewidths=0.55)
     plt.colorbar(sc, ax=ax, label='Uncertainty (std)')
     ax.set_xlabel('Actual Viability (%)')
     ax.set_ylabel('Predicted Viability (%)')
@@ -1106,10 +1204,12 @@ def plot_uncertainty_analysis(model, scaler, X: np.ndarray, y: np.ndarray,
     ax = axes[1, 0]
     if masks['literature'].any():
         ax.scatter(y_std[masks['literature']], np.abs(residuals[masks['literature']]),
-                   c=config.color_literature, s=50, alpha=0.4, edgecolors='white', linewidths=0.35)
+                   c=config.color_literature, marker=config.marker_literature, s=50, alpha=0.4,
+                   edgecolors='white', linewidths=0.35)
     if masks['wetlab'].any():
         ax.scatter(y_std[masks['wetlab']], np.abs(residuals[masks['wetlab']]),
-                   c=config.color_wetlab, s=100, alpha=0.9, edgecolors='white', linewidths=0.55)
+                   c=config.color_wetlab, marker=config.marker_wetlab, s=100, alpha=0.9,
+                   edgecolors='white', linewidths=0.55)
     z = np.polyfit(y_std, np.abs(residuals), 1)
     trend = np.poly1d(z)
     x_line = np.linspace(y_std.min(), y_std.max(), 200)
@@ -1206,11 +1306,13 @@ def plot_support_diagnostics(X: np.ndarray, y: np.ndarray, feature_names: Sequen
             **support_diagnostic_legend_kwargs(config),
         )
 
-    scatter = ax3.scatter(X[:, idx1], X[:, idx2], c=y, cmap=config.cmap_viability, s=180,
-                          alpha=0.20, edgecolors='white', linewidths=0.35)
+    scatter = ax3.scatter(X[:, idx1], X[:, idx2], c=y, cmap=config.cmap_viability,
+                          marker=config.marker_literature, s=180,
+                          alpha=config.support_scatter_alpha_for_colorbar, edgecolors='white', linewidths=0.35)
     if masks['wetlab'].any():
         ax3.scatter(X[masks['wetlab'], idx1], X[masks['wetlab'], idx2], c=y[masks['wetlab']],
-                    cmap=config.cmap_viability, s=300, alpha=0.95, edgecolors='black', linewidths=0.6)
+                    cmap=config.cmap_viability, marker=config.marker_wetlab, s=300,
+                    alpha=0.95, edgecolors='black', linewidths=0.6)
     x_min, x_max = quantile_range(X[:, idx1], config, weights=weights)
     y_min, y_max = quantile_range(X[:, idx2], config, weights=weights)
     ax3.set_xlim(x_min, x_max)
@@ -1234,14 +1336,16 @@ def plot_support_diagnostics(X: np.ndarray, y: np.ndarray, feature_names: Sequen
     print(f"  ✓ Support diagnostics saved: {output_path}")
 
 
-def main():
+def main(argv: Optional[Sequence[str]] = None):
     """Main entry point for explainability visualizations."""
+    args = parse_args(argv)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(script_dir))
     base_output_dir = os.path.join(project_root, 'results', 'explainability')
     os.makedirs(base_output_dir, exist_ok=True)
 
     config = ExplainabilityConfig()
+    apply_palette_profile(config, args.palette_profile)
     apply_publication_style(config)
 
     print("=" * 80)

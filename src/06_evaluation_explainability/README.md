@@ -22,6 +22,9 @@ python src/06_evaluation_explainability/evaluate_iterations.py
 
 # Model explainability
 python src/06_evaluation_explainability/explainability.py
+
+# Model explainability (legacy colors)
+python src/06_evaluation_explainability/explainability.py --palette-profile legacy
 ```
 
 ## Shared Inputs
@@ -117,11 +120,13 @@ The explainability suite is intentionally support-aware:
 - observed literature and wet-lab rows are overlaid wherever support matters
 - stronger-support regions are marked with dashed boundaries or line-style changes instead of masking the surface
 - the BO landscape keeps the contour aesthetic, but documents which production penalties are included
+- default colormaps use a warm, color-blind-friendly profile (`magma` / `cividis` / `viridis`);
+  use `--palette-profile legacy` to reproduce the historical palette (`RdYlGn` / `YlOrRd` / `viridis`)
 
 Support cues:
 
 - In `partial_dependence_plots.png`, dashed curve segments indicate the same empirical slice continued outside stronger local 1D support.
-- In `interaction_contours.png` and `acquisition_landscape.png`, the dashed white boundary marks the stronger pairwise support envelope estimated from observed formulations.
+- In `interaction_contours.png` and `acquisition_landscape.png`, the contrast-adaptive dashed boundary marks the stronger pairwise support envelope estimated from observed formulations.
 - Inside that dashed boundary, the surface is better grounded in observed data. Outside it, the surface is shown for continuity, but should be interpreted as more extrapolative.
 - In `feature_importance.png`, the vertical dashed line is only a visual dominance cutoff to separate the strongest features from the long tail; it is not a hard statistical threshold.
 - In `shap_summary.png`, only the top features are shown. Color encodes feature value and horizontal spread shows directional contribution magnitude across observed formulations.
