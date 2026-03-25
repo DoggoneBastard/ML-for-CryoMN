@@ -326,7 +326,7 @@ def alpha_legend_handles(config: ExplainabilityConfig, base_color: Optional[str]
                markersize=7 * marker_scale, alpha=0.20),
         Line2D([0], [0], marker=config.marker_wetlab, color='none', markerfacecolor=color,
                markeredgecolor='white', markeredgewidth=0.6, label='Wet Lab',
-               markersize=8 * marker_scale, alpha=0.95),
+               markersize=8 * marker_scale, alpha=0.90),
     ]
 
 
@@ -394,6 +394,36 @@ def estimate_surface_luminance(surface: np.ndarray, cmap_name: str,
     return float(np.mean([relative_luminance(cmap(float(pos))) for pos in sample_positions]))
 
 
+def surface_luminance_map(surface: np.ndarray, cmap_name: str,
+                          vmin: Optional[float] = None,
+                          vmax: Optional[float] = None) -> Optional[np.ndarray]:
+    """Return per-cell background luminance values for a scalar surface."""
+    array = np.asarray(surface, dtype=float)
+    finite_mask = np.isfinite(array)
+    if not np.any(finite_mask):
+        return None
+
+    finite = array[finite_mask]
+    if vmin is None:
+        vmin = float(finite.min())
+    if vmax is None:
+        vmax = float(finite.max())
+
+    normalized = np.full(array.shape, 0.5, dtype=float)
+    if not np.isclose(vmax, vmin):
+        normalized[finite_mask] = np.clip((array[finite_mask] - vmin) / (vmax - vmin), 0.0, 1.0)
+
+    rgba = plt.get_cmap(cmap_name)(normalized)[..., :3]
+    linear = np.where(
+        rgba <= 0.04045,
+        rgba / 12.92,
+        ((rgba + 0.055) / 1.055) ** 2.4,
+    )
+    luminance = np.tensordot(linear, np.array([0.2126, 0.7152, 0.0722]), axes=([2], [0]))
+    luminance[~finite_mask] = np.nan
+    return luminance
+
+
 def choose_contrasting_surface_color(background_luminance: float,
                                      config: ExplainabilityConfig) -> str:
     """Choose dark/light overlay color with the better contrast ratio."""
@@ -423,23 +453,36 @@ def choose_foreground_color_for_surface(surface: np.ndarray, cmap_name: str,
     if array.ndim != 2:
         return choose_contour_line_color(surface, cmap_name, config)
 
-    row_extent = max(1, int(np.ceil(array.shape[0] * 0.30)))
-    col_extent = max(1, int(np.ceil(array.shape[1] * 0.35)))
-    row_slice = slice(0, row_extent) if 'upper' in loc else slice(array.shape[0] - row_extent, array.shape[0])
+    row_extent = max(1, int(np.ceil(array.shape[0] * 0.18)))
+    col_extent = max(1, int(np.ceil(array.shape[1] * 0.22)))
+    # Contour surfaces follow meshgrid indexing, so the last rows render at the top.
+    row_slice = slice(array.shape[0] - row_extent, array.shape[0]) if 'upper' in loc else slice(0, row_extent)
     col_slice = slice(array.shape[1] - col_extent, array.shape[1]) if 'right' in loc else slice(0, col_extent)
     local_surface = array[row_slice, col_slice]
     global_finite = array[np.isfinite(array)]
     if global_finite.size == 0:
         return config.contour_line_dark
-    local_luminance = estimate_surface_luminance(
+    local_luminance_map = surface_luminance_map(
         local_surface,
         cmap_name,
         vmin=float(global_finite.min()),
         vmax=float(global_finite.max()),
     )
-    if local_luminance is None:
+    if local_luminance_map is None:
         return config.contour_line_dark
-    return choose_contrasting_surface_color(local_luminance, config)
+
+    local_luminance = local_luminance_map[np.isfinite(local_luminance_map)]
+    if local_luminance.size == 0:
+        return config.contour_line_dark
+
+    dark_lum = relative_luminance(config.contour_line_dark)
+    light_lum = relative_luminance(config.contour_line_light)
+    dark_contrast = np.array([contrast_ratio(bg, dark_lum) for bg in local_luminance], dtype=float)
+    light_contrast = np.array([contrast_ratio(bg, light_lum) for bg in local_luminance], dtype=float)
+
+    if float(np.quantile(dark_contrast, 0.25)) >= float(np.quantile(light_contrast, 0.25)):
+        return config.contour_line_dark
+    return config.contour_line_light
 
 
 def style_legend_for_surface(legend, surface: np.ndarray, cmap_name: str,
@@ -1170,19 +1213,21 @@ def plot_uncertainty_analysis(model, scaler, X: np.ndarray, y: np.ndarray,
 
     ax = axes[0, 0]
     ax.plot([0, 100], [0, 100], linestyle='--', color='#4a5966', alpha=0.7, linewidth=2)
-    if masks['literature'].any():
+    if masks['wetlab'].any():
+        sc = ax.scatter(y[masks['wetlab']], y_pred[masks['wetlab']], c=y_std[masks['wetlab']],
+                        cmap=config.cmap_uncertainty, marker=config.marker_wetlab, s=80, alpha=0.90,
+                        edgecolors='white', linewidths=0.55)
+    elif masks['literature'].any():
         sc = ax.scatter(y[masks['literature']], y_pred[masks['literature']], c=y_std[masks['literature']],
                         cmap=config.cmap_uncertainty, marker=config.marker_literature, s=40,
-                        alpha=config.uncertainty_scatter_alpha_for_colorbar,
-                        edgecolors='white', linewidths=0.35)
+                        alpha=0.20, edgecolors='white', linewidths=0.35)
     else:
         sc = ax.scatter(y, y_pred, c=y_std, cmap=config.cmap_uncertainty, s=36,
-                        alpha=config.uncertainty_scatter_alpha_for_colorbar,
-                        edgecolors='white', linewidths=0.35)
-    if masks['wetlab'].any():
-        ax.scatter(y[masks['wetlab']], y_pred[masks['wetlab']], c=y_std[masks['wetlab']],
-                   cmap=config.cmap_uncertainty, marker=config.marker_wetlab, s=80, alpha=0.95,
-                   edgecolors='white', linewidths=0.55)
+                        alpha=0.20, edgecolors='white', linewidths=0.35)
+    if masks['wetlab'].any() and masks['literature'].any():
+        ax.scatter(y[masks['literature']], y_pred[masks['literature']], c=y_std[masks['literature']],
+                   cmap=config.cmap_uncertainty, marker=config.marker_literature, s=40, alpha=0.20,
+                   edgecolors='white', linewidths=0.35)
     plt.colorbar(sc, ax=ax, label='Uncertainty (std)')
     ax.set_xlabel('Actual Viability (%)')
     ax.set_ylabel('Predicted Viability (%)')
@@ -1306,13 +1351,22 @@ def plot_support_diagnostics(X: np.ndarray, y: np.ndarray, feature_names: Sequen
             **support_diagnostic_legend_kwargs(config),
         )
 
-    scatter = ax3.scatter(X[:, idx1], X[:, idx2], c=y, cmap=config.cmap_viability,
-                          marker=config.marker_literature, s=180,
-                          alpha=config.support_scatter_alpha_for_colorbar, edgecolors='white', linewidths=0.35)
     if masks['wetlab'].any():
-        ax3.scatter(X[masks['wetlab'], idx1], X[masks['wetlab'], idx2], c=y[masks['wetlab']],
-                    cmap=config.cmap_viability, marker=config.marker_wetlab, s=300,
-                    alpha=0.95, edgecolors='black', linewidths=0.6)
+        scatter = ax3.scatter(X[masks['wetlab'], idx1], X[masks['wetlab'], idx2], c=y[masks['wetlab']],
+                              cmap=config.cmap_viability, marker=config.marker_wetlab, s=300,
+                              alpha=0.90, edgecolors='black', linewidths=0.6)
+    elif masks['literature'].any():
+        scatter = ax3.scatter(X[masks['literature'], idx1], X[masks['literature'], idx2], c=y[masks['literature']],
+                              cmap=config.cmap_viability, marker=config.marker_literature, s=180,
+                              alpha=0.20, edgecolors='white', linewidths=0.35)
+    else:
+        scatter = ax3.scatter(X[:, idx1], X[:, idx2], c=y, cmap=config.cmap_viability,
+                              marker=config.marker_literature, s=180,
+                              alpha=0.20, edgecolors='white', linewidths=0.35)
+    if masks['wetlab'].any() and masks['literature'].any():
+        ax3.scatter(X[masks['literature'], idx1], X[masks['literature'], idx2], c=y[masks['literature']],
+                    cmap=config.cmap_viability, marker=config.marker_literature, s=180,
+                    alpha=0.20, edgecolors='white', linewidths=0.35)
     x_min, x_max = quantile_range(X[:, idx1], config, weights=weights)
     y_min, y_max = quantile_range(X[:, idx2], config, weights=weights)
     ax3.set_xlim(x_min, x_max)
