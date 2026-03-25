@@ -48,18 +48,18 @@
       "mean_uncertainty": 19.19245034420479
     }
   },
-  "updated_at": "2026-03-25T12:30:38.644049",
-  "n_validation_samples": 61,
+  "updated_at": "2026-03-18T14:03:08.919319",
+  "n_validation_samples": 49,
   "n_literature_samples": 198,
-  "validation_rmse": 18.081868483825286,
-  "literature_only_rmse": 30.803814996853355,
+  "validation_rmse": 16.641622542594344,
+  "literature_only_rmse": 32.48414163525976,
   "weighting_method": "prior_mean_correction",
   "alpha_literature": 1.0,
   "alpha_wetlab": 0.02,
   "noise_ratio": 50.0,
   "is_composite_model": true,
-  "wetlab_train_rmse": 3.9177539588724306,
-  "iteration": 6,
+  "wetlab_train_rmse": 3.0633208490527837,
+  "iteration": 5,
   "model_method": "prior_mean_correction",
-  "iteration_dir": "iteration_6_prior_mean"
+  "iteration_dir": "iteration_5_prior_mean"
 }
