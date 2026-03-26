@@ -1229,7 +1229,7 @@ def plot_uncertainty_analysis(model, scaler, X: np.ndarray, y: np.ndarray,
                    cmap=config.cmap_uncertainty, marker=config.marker_literature, s=40, alpha=0.20,
                    edgecolors='white', linewidths=0.35)
     plt.colorbar(sc, ax=ax, label='Uncertainty (std)')
-    ax.set_xlabel('Actual Viability (%)')
+    ax.set_xlabel('Measured / Reported Viability (%)')
     ax.set_ylabel('Predicted Viability (%)')
     ax.set_title('Predicted vs Actual', fontsize=14 + FONT_BUMP, fontweight='bold', pad=10)
     ax.legend(handles=alpha_legend_handles(config), loc='upper left')
