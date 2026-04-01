@@ -824,12 +824,11 @@ def write_performance_plot(results: Sequence[Dict[str, object]]):
 
     stage_results = list(results)
 
-    def display_label(result: Dict[str, object]) -> str:
-        if result["label"] == "literature_only":
-            return "literature\nonly"
-        return str(result["label"]).replace("_", "\n")
+    def stage_axis_label(stage: object) -> str:
+        """Render stage labels as numeric stage IDs."""
+        return str(int(stage))
 
-    labels = [display_label(result) for result in stage_results]
+    labels = [stage_axis_label(result["stage"]) for result in stage_results]
 
     category_specs = [
         {
@@ -871,7 +870,14 @@ def write_performance_plot(results: Sequence[Dict[str, object]]):
             return "N/A"
         return f"{float(value):.{digits}f}"
 
-    stage_colors = ["#9ecae1", "#fbb4ae", "#ccebc5", "#decbe4", "#fed9a6", "#e0e0e0"]
+    stage_colors = [
+        "#9ecae1",
+        "#fbb4ae",
+        "#ccebc5",
+        "#decbe4",
+        "#fed9a6",
+        "#e0e0e0",
+    ]
 
     plt.style.use("seaborn-v0_8-whitegrid")
     max_cols = max(len(category["metrics"]) for category in category_specs)
@@ -919,15 +925,17 @@ def write_performance_plot(results: Sequence[Dict[str, object]]):
                 dtype=float,
             )
             x = np.arange(len(labels))
+            bar_width = float(np.clip(7.5 / max(len(labels), 1), 0.18, 0.75))
             finite_mask = np.isfinite(values)
             bar_colors = [
-                stage_colors[idx] if is_finite else "#cfcfcf"
+                stage_colors[idx % len(stage_colors)] if is_finite else "#cfcfcf"
                 for idx, is_finite in enumerate(finite_mask)
             ]
             heights = np.where(finite_mask, values, 0.0)
             bars = ax.bar(
                 x,
                 heights,
+                width=bar_width,
                 color=bar_colors,
                 edgecolor="#444444",
                 linewidth=0.6,
@@ -1000,6 +1008,10 @@ def write_performance_plot(results: Sequence[Dict[str, object]]):
 
 def write_next_formulations_plot(results: Sequence[Dict[str, object]]):
     """Save a dedicated side-by-side plot for `07` exploit vs explore performance."""
+    def stage_axis_label(stage: object) -> str:
+        """Render stage labels as numeric stage IDs."""
+        return str(int(stage))
+
     plot_rows: List[Dict[str, object]] = []
     for result in results:
         next_eval = result.get("next_formulations_evaluation")
@@ -1012,7 +1024,7 @@ def write_next_formulations_plot(results: Sequence[Dict[str, object]]):
             continue
         plot_rows.append(
             {
-                "label": result["label"].replace("_", "\n"),
+                "label": stage_axis_label(result["stage"]),
                 "exploit": exploit,
                 "explore": explore,
             }
@@ -1040,7 +1052,7 @@ def write_next_formulations_plot(results: Sequence[Dict[str, object]]):
     colors = {"exploit": "#1f6aa5", "explore": "#d66a1f"}
     labels = [row["label"] for row in plot_rows]
     x = np.arange(len(labels))
-    width = 0.34
+    width = float(np.clip(2.8 / max(len(labels), 1), 0.12, 0.34))
 
     metric_specs = [
         ("Mean Actual Viability", "mean_actual_viability", None),

@@ -74,6 +74,19 @@
       "improvement": 13.672107676541842,
       "noise_ratio": 50.0,
       "timestamp": "2026-03-27T11:41:35.233894"
+    },
+    {
+      "iteration": 7,
+      "method": "prior_mean_correction",
+      "model_method": "prior_mean_correction",
+      "iteration_dir": "iteration_7_prior_mean",
+      "is_composite_model": true,
+      "n_validation_samples": 78,
+      "validation_rmse": 19.238416376652875,
+      "literature_rmse": 31.02198434706776,
+      "improvement": 11.783567970414886,
+      "noise_ratio": 50.0,
+      "timestamp": "2026-04-01T13:51:38.847735"
     }
   ]
 }

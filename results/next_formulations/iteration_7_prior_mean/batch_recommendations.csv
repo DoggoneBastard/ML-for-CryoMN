@@ -1,0 +1,64 @@
+batch_size,selection_order,recommendation_id,recommendation_type,origin,bucket_rank,predicted_viability,uncertainty,batch_utility,formulation
+6,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+6,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+6,3,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+6,4,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+6,5,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+6,6,19,explore,blindspot_probe,11,65.17535141715388,18.85688514421862,0.5864824323398673,2.15M propylene_glycol + 349.2mM sucrose
+7,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+7,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+7,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+7,4,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+7,5,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+7,6,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+7,7,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+8,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+8,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+8,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+8,4,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+8,5,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+8,6,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+8,7,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+8,8,19,explore,blindspot_probe,11,65.17535141715388,18.85688514421862,0.5864824323398673,2.15M propylene_glycol + 349.2mM sucrose
+9,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+9,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+9,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+9,4,4,exploit,bo_candidate,4,87.84854632766182,15.814741948722787,0.8575232658021761,39.2mM dmso + 286.6mM ectoin + 1.90M ethylene_glycol + 4.5% fbs
+9,5,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+9,6,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+9,7,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+9,8,16,explore,local_rank_probe,8,85.69546253309682,16.026668823265393,0.4859864227814066,39.2mM dmso + 286.6mM ectoin + 2.09M ethylene_glycol + 5.0% fbs
+9,9,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+10,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+10,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+10,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+10,4,4,exploit,bo_candidate,4,87.84854632766182,15.814741948722787,0.8575232658021761,39.2mM dmso + 286.6mM ectoin + 1.90M ethylene_glycol + 4.5% fbs
+10,5,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+10,6,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+10,7,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+10,8,16,explore,local_rank_probe,8,85.69546253309682,16.026668823265393,0.4859864227814066,39.2mM dmso + 286.6mM ectoin + 2.09M ethylene_glycol + 5.0% fbs
+10,9,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+10,10,19,explore,blindspot_probe,11,65.17535141715388,18.85688514421862,0.5864824323398673,2.15M propylene_glycol + 349.2mM sucrose
+11,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+11,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+11,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+11,4,4,exploit,bo_candidate,4,87.84854632766182,15.814741948722787,0.8575232658021761,39.2mM dmso + 286.6mM ectoin + 1.90M ethylene_glycol + 4.5% fbs
+11,5,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+11,6,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+11,7,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+11,8,16,explore,local_rank_probe,8,85.69546253309682,16.026668823265393,0.4859864227814066,39.2mM dmso + 286.6mM ectoin + 2.09M ethylene_glycol + 5.0% fbs
+11,9,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+11,10,19,explore,blindspot_probe,11,65.17535141715388,18.85688514421862,0.5864824323398673,2.15M propylene_glycol + 349.2mM sucrose
+11,11,20,explore,blindspot_probe,12,60.85023800347058,20.162636402835428,0.5701375674119228,486.8mM ethylene_glycol + 5.4% pvp
+12,1,1,exploit,bo_candidate,1,89.81358215320506,15.704052984043637,0.8953343146446464,284.8mM ectoin + 2.01M ethylene_glycol + 5.4% fbs
+12,2,2,exploit,bo_candidate,2,88.80919383507762,15.592725670296357,0.8792874977776041,30.1mM dmso + 285.8mM ectoin + 1.90M ethylene_glycol + 4.6% fbs
+12,3,3,exploit,bo_candidate,3,88.31546131358314,15.984667857380872,0.862674853234926,6.1mM dmso + 264.8mM ectoin + 1.97M ethylene_glycol + 5.4% fbs
+12,4,4,exploit,bo_candidate,4,87.84854632766182,15.814741948722787,0.8575232658021761,39.2mM dmso + 286.6mM ectoin + 1.90M ethylene_glycol + 4.5% fbs
+12,5,7,exploit,bo_candidate,7,87.79934129093864,15.83817484807042,0.8561729069175297,17.0mM dmso + 303.2mM ectoin + 2.10M ethylene_glycol + 2.7% fbs
+12,6,9,explore,local_rank_probe,1,88.9353031840802,15.465181991807315,0.5019756408427495,284.8mM ectoin + 1.81M ethylene_glycol + 4.9% fbs
+12,7,10,explore,local_rank_probe,2,84.81276577194112,16.495541525158412,0.4894264882878174,284.8mM ectoin + 2.21M ethylene_glycol + 6.0% fbs
+12,8,12,explore,local_rank_probe,4,86.71333345033169,15.85932565230837,0.49163547711750044,30.1mM dmso + 285.8mM ectoin + 2.09M ethylene_glycol + 5.1% fbs
+12,9,14,explore,local_rank_probe,6,84.24859411076619,16.81373595758281,0.4940469867665511,6.1mM dmso + 264.8mM ectoin + 2.16M ethylene_glycol + 5.9% fbs
+12,10,16,explore,local_rank_probe,8,85.69546253309682,16.026668823265393,0.4859864227814066,39.2mM dmso + 286.6mM ectoin + 2.09M ethylene_glycol + 5.0% fbs
+12,11,17,explore,blindspot_probe,9,51.22839541837404,25.704663398852155,0.6139877825197878,46.0% fbs + 6.0% pvp
+12,12,19,explore,blindspot_probe,11,65.17535141715388,18.85688514421862,0.5864824323398673,2.15M propylene_glycol + 349.2mM sucrose
