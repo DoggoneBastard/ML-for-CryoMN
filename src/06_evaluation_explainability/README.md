@@ -164,6 +164,7 @@ Artifacts:
 | `interaction_contours.png` | Support-aware pairwise contour maps with observed-point overlays and dashed support boundaries |
 | `acquisition_landscape.png` | Static BO score landscape using the `05` visual language, with support and sparsity penalties but no sequential batch-diversity term |
 | `uncertainty_analysis.png` | Decision-focused uncertainty dashboard covering calibration, residual growth, and uncertainty by viability band |
+| `wetlab_r2_predicted_vs_actual.png` | Wet-lab-only predicted-vs-actual scatter colored by signed error (`actual - predicted`), with `R²` computed across all wet-lab rows in the active observed context |
 | `support_diagnostics.png` | Compact support-envelope view for the top features and top pair, split by literature vs wet lab |
 
 Feature importance is always recomputed at runtime against the resolved active
