@@ -4,10 +4,10 @@
 
 This module builds the next wet-lab batch from the active model state.
 
-It always writes exactly **20 formulations**:
+It always writes exactly **20 formulations** with an adaptive exploit/explore split:
 
-- **8 exploitation** picks from the active iteration's `05_bo_optimization` outputs
-- **12 exploration/calibration** picks assembled from local-rank probes, blind-spot probes, and BO fallback only if needed
+- exploitation count is diagnostics-driven (default baseline 8, bounded to 4..12)
+- exploration/calibration count is the remaining rows to keep total batch size fixed at 20
 
 The script is intentionally strict. It validates required inputs before
 generation, validates all 20 outputs again before write, and aborts without
@@ -45,8 +45,10 @@ The stage sequence must be contiguous. If the active stage is iteration `N`,
 - source only from `05` BO candidate files
 - normalize loaded BO candidates with the same practical concentration floor used by `05`
 - drop already tested formulations
+- apply active-model calibration metadata (`bias_shift_percent`, `uncertainty_scale`) to prediction mean/std before ranking
 - rank by predicted viability with uncertainty and acquisition tie-breaks
-- keep a simple chemistry-family diversity cap so the final 8 are not all near-duplicates
+- keep a simple chemistry-family diversity cap so exploitation rows are not all near-duplicates
+- final exploitation count comes from recent diagnostics (`rmse`, `mean_signed_residual`, `coverage_1sigma`) on stage `N-1`
 
 ### Exploration / Calibration
 
@@ -59,7 +61,8 @@ The stage sequence must be contiguous. If the active stage is iteration `N`,
 - clip to BO bounds, zero sub-threshold trace ingredients, and enforce the BO-derived ingredient-count limit
 - re-score with the active model
 - keep local-rank and blind-spot probes ahead of BO fallback, even if a relaxed family cap is needed to fill the exploration bucket
-- backfill from BO only if fewer than 12 valid exploration rows survive after the generated-only top-up pass
+- set local-rank/blind-spot target counts adaptively from the chosen exploit/explore split
+- backfill from BO only if fewer than the target exploration rows survive after the generated-only top-up pass
 
 This is why `07` does not use `03_optimization` as a primary source. The
 exploration half is designed directly from model failures, not from a random
@@ -96,7 +99,7 @@ score that balances:
 - blind-spot value
 - novelty
 - chemistry-family diversity
-- the intended exploit / local-rank / blind-spot mix
+- the intended adaptive exploit / local-rank / blind-spot mix
 
 `next_formulations_summary.txt` also includes a text version of each
 recommended subset. For every batch size, the summary lists the selected rows,
@@ -137,7 +140,14 @@ The metadata and input-validation artifacts also record which residual threshold
 were tried, which threshold was selected, how many exploration rows came
 from local-rank probes, blind-spot probes, and BO fallback, which historical
 anchor stages fed the generated probes, and how each recommended smaller batch
-was scored.
+was scored. Adaptive split fields are included, for example:
+
+- `adaptive_split_policy`
+- `adaptive_split_diagnostics`
+- `adaptive_split_triggered_rules`
+- `exploit_count`, `explore_count`
+- `local_rank_probe_target_count`, `blindspot_probe_target_count`
+- `generated_explore_count`, `fallback_explore_count`
 
 ## Failure Mode
 

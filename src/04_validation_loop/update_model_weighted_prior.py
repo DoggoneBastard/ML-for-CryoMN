@@ -65,6 +65,10 @@ ALPHA_WETLAB = 0.02        # Lower noise: wet lab data is more trusted
 
 # Noise ratio in the combined approach
 NOISE_RATIO = ALPHA_LITERATURE / ALPHA_WETLAB  # 50x
+ALPHA_LITERATURE_GRID = (0.5, 1.0, 2.0)
+ALPHA_WETLAB_GRID = (0.005, 0.01, 0.02, 0.05)
+CALIBRATION_TARGET_1SIGMA = 0.68
+CALIBRATION_TARGET_2SIGMA = 0.95
 
 # Make the module importable under a stable name even when executed as a script.
 sys.modules.setdefault('update_model_weighted_prior', sys.modules[__name__])
@@ -243,23 +247,34 @@ def fit_correction_model(
     return gp_correction, scaler_corr
 
 
-def compute_wetlab_cv_rmse(
+def compute_wetlab_cv_diagnostics(
     gp_literature: GaussianProcessRegressor,
     scaler_lit: StandardScaler,
     X_val: np.ndarray,
     y_val: np.ndarray,
     alpha_wetlab: float,
-) -> float:
-    """Estimate wet-lab generalization error by cross-validating the correction GP."""
+) -> Dict[str, np.ndarray]:
+    """Estimate wet-lab predictive diagnostics via CV on the correction GP."""
     if len(X_val) < 2:
-        return float('nan')
+        return {
+            'rmse': float('nan'),
+            'coverage_1sigma': float('nan'),
+            'coverage_2sigma': float('nan'),
+            'mean_signed_residual': float('nan'),
+            'mean_abs_residual': float('nan'),
+            'y_true': y_val.copy(),
+            'y_pred': np.full(len(y_val), np.nan, dtype=float),
+            'y_std': np.full(len(y_val), np.nan, dtype=float),
+            'residuals': np.full(len(y_val), np.nan, dtype=float),
+        }
 
     y_lit_pred = gp_literature.predict(scaler_lit.transform(X_val))
     residuals = y_val - y_lit_pred
     splitter = KFold(
         n_splits=min(5, len(X_val)), shuffle=True, random_state=42
     )
-    y_pred = np.zeros(len(y_val))
+    y_pred = np.zeros(len(y_val), dtype=float)
+    y_std = np.zeros(len(y_val), dtype=float)
 
     for train_idx, test_idx in splitter.split(X_val):
         gp_corr_fold, scaler_corr_fold = fit_correction_model(
@@ -271,9 +286,129 @@ def compute_wetlab_cv_rmse(
             scaler_literature=scaler_lit,
             scaler_correction=scaler_corr_fold,
         )
-        y_pred[test_idx] = composite_fold.predict(X_val[test_idx])
+        fold_pred, fold_std = composite_fold.predict(X_val[test_idx], return_std=True)
+        y_pred[test_idx] = fold_pred
+        y_std[test_idx] = fold_std
 
-    return float(np.sqrt(np.mean((y_val - y_pred) ** 2)))
+    cv_residuals = y_val - y_pred
+    return {
+        'rmse': float(np.sqrt(np.mean(cv_residuals ** 2))),
+        'coverage_1sigma': float(np.mean(np.abs(cv_residuals) <= y_std)),
+        'coverage_2sigma': float(np.mean(np.abs(cv_residuals) <= 2.0 * y_std)),
+        'mean_signed_residual': float(np.mean(cv_residuals)),
+        'mean_abs_residual': float(np.mean(np.abs(cv_residuals))),
+        'y_true': y_val.copy(),
+        'y_pred': y_pred,
+        'y_std': y_std,
+        'residuals': cv_residuals,
+    }
+
+
+def choose_uncertainty_scale(
+    residuals: np.ndarray,
+    predicted_std: np.ndarray,
+    target_1sigma: float = CALIBRATION_TARGET_1SIGMA,
+    target_2sigma: float = CALIBRATION_TARGET_2SIGMA,
+) -> float:
+    """Pick one multiplicative std scale from residual diagnostics."""
+    residuals = np.asarray(residuals, dtype=float)
+    predicted_std = np.asarray(predicted_std, dtype=float)
+    valid = np.isfinite(residuals) & np.isfinite(predicted_std)
+    if not np.any(valid):
+        return 1.0
+
+    residuals = residuals[valid]
+    predicted_std = np.maximum(predicted_std[valid], 1e-9)
+    scale_grid = np.linspace(0.6, 2.0, 71)
+    best_scale = 1.0
+    best_score = float('inf')
+    for scale in scale_grid:
+        scaled_std = predicted_std * float(scale)
+        coverage_1 = float(np.mean(np.abs(residuals) <= scaled_std))
+        coverage_2 = float(np.mean(np.abs(residuals) <= 2.0 * scaled_std))
+        score = abs(coverage_1 - target_1sigma) + 0.5 * abs(coverage_2 - target_2sigma)
+        if score < best_score:
+            best_score = score
+            best_scale = float(scale)
+    return best_scale
+
+
+def select_noise_levels(
+    X_orig: np.ndarray,
+    y_orig: np.ndarray,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    alpha_literature_candidates: Tuple[float, ...] = ALPHA_LITERATURE_GRID,
+    alpha_wetlab_candidates: Tuple[float, ...] = ALPHA_WETLAB_GRID,
+) -> Dict[str, object]:
+    """Select alpha_literature and alpha_wetlab from fixed grids."""
+    if len(X_val) < 2:
+        return {
+            'selected_alpha_literature': ALPHA_LITERATURE,
+            'selected_alpha_wetlab': ALPHA_WETLAB,
+            'search_results': [],
+            'selected_metrics': {
+                'rmse': float('nan'),
+                'coverage_1sigma': float('nan'),
+                'coverage_2sigma': float('nan'),
+                'mean_signed_residual': float('nan'),
+            },
+            'selection_mode': 'default_insufficient_wetlab_rows',
+        }
+
+    search_rows = []
+    best_tuple = None
+    best_row: Optional[Dict[str, float]] = None
+    best_diag = None
+
+    for alpha_literature in alpha_literature_candidates:
+        gp_literature, scaler_lit = fit_literature_model(
+            X_orig,
+            y_orig,
+            float(alpha_literature),
+        )
+        for alpha_wetlab in alpha_wetlab_candidates:
+            diag = compute_wetlab_cv_diagnostics(
+                gp_literature,
+                scaler_lit,
+                X_val,
+                y_val,
+                float(alpha_wetlab),
+            )
+            row = {
+                'alpha_literature': float(alpha_literature),
+                'alpha_wetlab': float(alpha_wetlab),
+                'rmse': float(diag['rmse']),
+                'coverage_1sigma': float(diag['coverage_1sigma']),
+                'coverage_2sigma': float(diag['coverage_2sigma']),
+                'mean_signed_residual': float(diag['mean_signed_residual']),
+            }
+            search_rows.append(row)
+            score_tuple = (
+                row['rmse'],
+                abs(row['coverage_1sigma'] - CALIBRATION_TARGET_1SIGMA),
+                abs(row['mean_signed_residual']),
+            )
+            if best_tuple is None or score_tuple < best_tuple:
+                best_tuple = score_tuple
+                best_row = row
+                best_diag = diag
+
+    assert best_row is not None
+    assert best_diag is not None
+    return {
+        'selected_alpha_literature': float(best_row['alpha_literature']),
+        'selected_alpha_wetlab': float(best_row['alpha_wetlab']),
+        'search_results': search_rows,
+        'selected_metrics': {
+            'rmse': float(best_row['rmse']),
+            'coverage_1sigma': float(best_row['coverage_1sigma']),
+            'coverage_2sigma': float(best_row['coverage_2sigma']),
+            'mean_signed_residual': float(best_row['mean_signed_residual']),
+        },
+        'selected_cv': best_diag,
+        'selection_mode': 'grid_search',
+    }
 
 
 def train_prior_mean_model(
@@ -304,10 +439,29 @@ def train_prior_mean_model(
     )
     y_composite_pred = composite_model.predict(X_val)
     train_rmse = float(np.sqrt(np.mean((y_val - y_composite_pred) ** 2)))
-    val_rmse = compute_wetlab_cv_rmse(
+    cv_diag = compute_wetlab_cv_diagnostics(
         gp_literature, scaler_lit, X_val, y_val, alpha_wetlab
     )
+    val_rmse = float(cv_diag['rmse'])
     lit_rmse = float(np.sqrt(np.mean((y_val - y_lit_pred) ** 2)))
+    bias_shift = float(cv_diag['mean_signed_residual']) if np.isfinite(cv_diag['mean_signed_residual']) else 0.0
+    uncertainty_scale = choose_uncertainty_scale(
+        cv_diag['residuals'],
+        cv_diag['y_std'],
+    )
+
+    calibrated_residuals = cv_diag['residuals'] - bias_shift
+    calibrated_std = np.maximum(cv_diag['y_std'] * uncertainty_scale, 1e-9)
+    calibrated_coverage_1 = (
+        float(np.mean(np.abs(calibrated_residuals) <= calibrated_std))
+        if len(calibrated_residuals)
+        else float('nan')
+    )
+    calibrated_coverage_2 = (
+        float(np.mean(np.abs(calibrated_residuals) <= 2.0 * calibrated_std))
+        if len(calibrated_residuals)
+        else float('nan')
+    )
 
     return {
         'model': composite_model,
@@ -323,6 +477,14 @@ def train_prior_mean_model(
         'improvement': lit_rmse - val_rmse,
         'noise_ratio': alpha_literature / alpha_wetlab,
         'mean_residual': float(np.mean(residuals)),
+        'bias_shift_percent': bias_shift,
+        'uncertainty_scale': float(uncertainty_scale),
+        'cv_coverage_1sigma': float(cv_diag['coverage_1sigma']),
+        'cv_coverage_2sigma': float(cv_diag['coverage_2sigma']),
+        'cv_mean_signed_residual': float(cv_diag['mean_signed_residual']),
+        'cv_mean_abs_residual': float(cv_diag['mean_abs_residual']),
+        'cv_coverage_1sigma_calibrated': calibrated_coverage_1,
+        'cv_coverage_2sigma_calibrated': calibrated_coverage_2,
     }
 
 
@@ -413,9 +575,27 @@ def update_model_with_prior_mean(
     X_val, y_val = validation_data
     X_orig, y_orig = original_data
     
-    print(f"Literature data: {len(X_orig)} samples (α={alpha_literature})")
-    print(f"Wet lab data: {len(X_val)} samples (α={alpha_wetlab})")
-    print(f"Noise ratio (literature/wetlab): {alpha_literature/alpha_wetlab:.1f}x")
+    print(f"Literature data: {len(X_orig)} samples")
+    print(f"Wet lab data: {len(X_val)} samples")
+    tuning = select_noise_levels(X_orig, y_orig, X_val, y_val)
+    selected_alpha_literature = float(tuning['selected_alpha_literature'])
+    selected_alpha_wetlab = float(tuning['selected_alpha_wetlab'])
+    print(
+        f"Selected α values: literature={selected_alpha_literature} | "
+        f"wet lab={selected_alpha_wetlab}"
+    )
+    print(
+        "Noise ratio (literature/wetlab): "
+        f"{selected_alpha_literature/selected_alpha_wetlab:.1f}x"
+    )
+    if tuning.get('selection_mode') == 'grid_search':
+        selected_metrics = tuning['selected_metrics']
+        print(
+            "Selection diagnostics (CV): "
+            f"RMSE={selected_metrics['rmse']:.2f}, "
+            f"coverage@1σ={selected_metrics['coverage_1sigma']:.3f}, "
+            f"mean residual={selected_metrics['mean_signed_residual']:+.2f}"
+        )
     
     # =========================================================================
     # Stage 1: Literature model (already trained, or retrain for consistency)
@@ -424,7 +604,12 @@ def update_model_with_prior_mean(
     
     print("Training literature model...")
     training = train_prior_mean_model(
-        X_orig, y_orig, X_val, y_val, alpha_literature=alpha_literature, alpha_wetlab=alpha_wetlab
+        X_orig,
+        y_orig,
+        X_val,
+        y_val,
+        alpha_literature=selected_alpha_literature,
+        alpha_wetlab=selected_alpha_wetlab,
     )
     composite_model = training['model']
     gp_literature = training['gp_literature']
@@ -484,9 +669,21 @@ def update_model_with_prior_mean(
     metadata['wetlab_train_rmse'] = train_rmse
     metadata['literature_only_rmse'] = lit_rmse
     metadata['weighting_method'] = 'prior_mean_correction'
-    metadata['alpha_literature'] = alpha_literature
-    metadata['alpha_wetlab'] = alpha_wetlab
-    metadata['noise_ratio'] = alpha_literature / alpha_wetlab
+    metadata['alpha_literature'] = selected_alpha_literature
+    metadata['alpha_wetlab'] = selected_alpha_wetlab
+    metadata['noise_ratio'] = selected_alpha_literature / selected_alpha_wetlab
+    metadata['alpha_literature_selected'] = selected_alpha_literature
+    metadata['alpha_wetlab_selected'] = selected_alpha_wetlab
+    metadata['bias_shift_percent'] = training['bias_shift_percent']
+    metadata['uncertainty_scale'] = training['uncertainty_scale']
+    metadata['cv_coverage_1sigma'] = training['cv_coverage_1sigma']
+    metadata['cv_coverage_2sigma'] = training['cv_coverage_2sigma']
+    metadata['cv_mean_signed_residual'] = training['cv_mean_signed_residual']
+    metadata['cv_mean_abs_residual'] = training['cv_mean_abs_residual']
+    metadata['cv_coverage_1sigma_calibrated'] = training['cv_coverage_1sigma_calibrated']
+    metadata['cv_coverage_2sigma_calibrated'] = training['cv_coverage_2sigma_calibrated']
+    metadata['alpha_grid_search'] = list(tuning.get('search_results', []))
+    metadata['alpha_selection_mode'] = str(tuning.get('selection_mode'))
     metadata = stamp_model_metadata(
         metadata,
         iteration=iteration,
@@ -506,6 +703,15 @@ def update_model_with_prior_mean(
         'improvement': training['improvement'],
         'noise_ratio': training['noise_ratio'],
         'mean_residual': training['mean_residual'],
+        'selected_alpha_literature': selected_alpha_literature,
+        'selected_alpha_wetlab': selected_alpha_wetlab,
+        'bias_shift_percent': training['bias_shift_percent'],
+        'uncertainty_scale': training['uncertainty_scale'],
+        'cv_coverage_1sigma': training['cv_coverage_1sigma'],
+        'cv_coverage_2sigma': training['cv_coverage_2sigma'],
+        'cv_mean_signed_residual': training['cv_mean_signed_residual'],
+        'cv_coverage_1sigma_calibrated': training['cv_coverage_1sigma_calibrated'],
+        'cv_coverage_2sigma_calibrated': training['cv_coverage_2sigma_calibrated'],
     }
 
 
@@ -619,7 +825,7 @@ def main():
         model_method=model_method,
         iteration=iteration,
         iteration_dir=iteration_dir_name,
-        wetlab_context_weight=float(NOISE_RATIO),
+        wetlab_context_weight=float(stats['noise_ratio']),
     )
     save_observed_context(updated_model_dir, observed_context_df)
     
@@ -660,6 +866,13 @@ def main():
     print(f"\nMethod: Literature as prior + wet lab correction")
     print(f"Improvement over literature-only (CV RMSE): {stats['improvement']:.2f}")
     print(f"Mean systematic bias found: {stats['mean_residual']:+.2f}%")
+    print(
+        "Calibration diagnostics (CV): "
+        f"coverage@1σ={stats['cv_coverage_1sigma']:.3f}, "
+        f"coverage@2σ={stats['cv_coverage_2sigma']:.3f}, "
+        f"bias shift={stats['bias_shift_percent']:+.2f}, "
+        f"uncertainty scale={stats['uncertainty_scale']:.3f}"
+    )
     print(f"\nNext steps:")
     print(f"  1. Run optimization: python src/05_bo_optimization/bo_optimizer.py")
     print(f"  2. Test top candidates in wet lab")

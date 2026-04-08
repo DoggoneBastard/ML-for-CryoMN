@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the next wet-lab formulations with a fixed 10/10 exploit-explore split.
+Generate the next wet-lab formulations with an adaptive exploit-explore split.
 
 The script is intentionally strict:
 - validate required inputs up front
@@ -54,14 +54,20 @@ from formulation_formatting import (  # noqa: E402
 )
 from update_model_weighted_prior import CompositeGP  # noqa: F401,E402
 from bo_optimizer import BOConfig, BayesianOptimizer  # noqa: E402
+from prediction_calibration import apply_prediction_calibration  # noqa: E402
 
 
 EXPERIMENT_ID_PATTERN = re.compile(r"(\d+)")
 ITERATION_DIR_PATTERN = re.compile(r"^iteration_(\d+)(?:_[A-Za-z0-9_]+)?$")
 FEATURE_THRESHOLD = 1e-6
 GENERATION_SEED = 42
-EXPLOIT_COUNT = 8
-EXPLORE_COUNT = 12
+ADAPTIVE_SPLIT_POLICY = "aggressive"
+DEFAULT_EXPLOIT_COUNT = 8
+DEFAULT_EXPLORE_COUNT = 12
+MIN_EXPLOIT_COUNT = 4
+MAX_EXPLOIT_COUNT = 12
+EXPLOIT_COUNT = DEFAULT_EXPLOIT_COUNT
+EXPLORE_COUNT = DEFAULT_EXPLORE_COUNT
 TOTAL_COUNT = EXPLOIT_COUNT + EXPLORE_COUNT
 LOCAL_RANK_PROBE_COUNT = 8
 BLINDSPOT_PROBE_COUNT = 4
@@ -106,6 +112,149 @@ class StageArtifacts:
     model: object
     scaler: Optional[object]
     observed_context: pd.DataFrame
+
+
+def set_runtime_split_counts(
+    exploit_count: int,
+    explore_count: int,
+    local_rank_probe_count: int,
+    blindspot_probe_count: int,
+) -> None:
+    """Apply adaptive split counts to module-level selection constants."""
+    global EXPLOIT_COUNT
+    global EXPLORE_COUNT
+    global LOCAL_RANK_PROBE_COUNT
+    global BLINDSPOT_PROBE_COUNT
+
+    if exploit_count + explore_count != TOTAL_COUNT:
+        raise ValidationError(
+            f"Adaptive split must sum to {TOTAL_COUNT}, got exploit={exploit_count}, explore={explore_count}."
+        )
+    if local_rank_probe_count + blindspot_probe_count != explore_count:
+        raise ValidationError(
+            f"Adaptive exploration mix must sum to {explore_count}, got local={local_rank_probe_count}, blind={blindspot_probe_count}."
+        )
+
+    EXPLOIT_COUNT = int(exploit_count)
+    EXPLORE_COUNT = int(explore_count)
+    LOCAL_RANK_PROBE_COUNT = int(local_rank_probe_count)
+    BLINDSPOT_PROBE_COUNT = int(blindspot_probe_count)
+
+
+def compute_recent_split_diagnostics(previous_batch: pd.DataFrame) -> Dict[str, float]:
+    """Compute residual diagnostics from the latest completed stage batch."""
+    if previous_batch.empty:
+        return {
+            "rmse": float("nan"),
+            "mean_signed_residual": float("nan"),
+            "coverage_1sigma": float("nan"),
+        }
+    residuals = previous_batch["residual"].astype(float).to_numpy()
+    uncertainty = previous_batch.get("uncertainty_previous_stage")
+    if uncertainty is None:
+        uncertainty = previous_batch.get("uncertainty_stage_model")
+    if uncertainty is None:
+        uncertainty = pd.Series(np.full(len(previous_batch), np.nan))
+    uncertainty = pd.to_numeric(uncertainty, errors="coerce").to_numpy(dtype=float)
+    valid = np.isfinite(residuals) & np.isfinite(uncertainty) & (uncertainty >= 0.0)
+    coverage = float(np.mean(np.abs(residuals[valid]) <= uncertainty[valid])) if np.any(valid) else float("nan")
+    return {
+        "rmse": float(np.sqrt(np.mean(residuals ** 2))),
+        "mean_signed_residual": float(np.mean(residuals)),
+        "coverage_1sigma": coverage,
+    }
+
+
+def choose_adaptive_split(previous_batch: pd.DataFrame) -> Dict[str, object]:
+    """Select aggressive adaptive exploit/explore counts from recent residual behavior."""
+    diagnostics = compute_recent_split_diagnostics(previous_batch)
+    rmse = float(diagnostics["rmse"])
+    mean_signed = float(diagnostics["mean_signed_residual"])
+    coverage_1sigma = float(diagnostics["coverage_1sigma"])
+
+    exploit_count = DEFAULT_EXPLOIT_COUNT
+    triggered: List[str] = []
+
+    poor_flags = 0
+    if np.isfinite(coverage_1sigma) and coverage_1sigma < 0.50:
+        poor_flags += 1
+        triggered.append("coverage_1sigma_lt_0.50")
+    if np.isfinite(mean_signed) and mean_signed <= -10.0:
+        poor_flags += 1
+        triggered.append("mean_signed_residual_le_-10")
+    if np.isfinite(rmse) and rmse >= 22.0:
+        poor_flags += 1
+        triggered.append("rmse_ge_22")
+    if poor_flags >= 1:
+        exploit_count = 7
+    if poor_flags >= 2:
+        exploit_count = 6
+    if (
+        np.isfinite(coverage_1sigma)
+        and np.isfinite(mean_signed)
+        and coverage_1sigma < 0.40
+        and mean_signed <= -20.0
+    ):
+        exploit_count = 5
+        triggered.append("coverage_1sigma_lt_0.40_and_mean_signed_residual_le_-20")
+    if (
+        np.isfinite(coverage_1sigma)
+        and np.isfinite(mean_signed)
+        and np.isfinite(rmse)
+        and coverage_1sigma < 0.35
+        and mean_signed <= -25.0
+        and rmse >= 25.0
+    ):
+        exploit_count = 4
+        triggered.append("coverage_1sigma_lt_0.35_and_mean_signed_residual_le_-25_and_rmse_ge_25")
+
+    if (
+        np.isfinite(coverage_1sigma)
+        and np.isfinite(mean_signed)
+        and np.isfinite(rmse)
+        and coverage_1sigma >= 0.65
+        and abs(mean_signed) <= 8.0
+        and rmse <= 15.0
+    ):
+        exploit_count = 10
+        triggered.append("coverage_1sigma_ge_0.65_and_abs_mean_signed_residual_le_8_and_rmse_le_15")
+    if (
+        np.isfinite(coverage_1sigma)
+        and np.isfinite(mean_signed)
+        and np.isfinite(rmse)
+        and coverage_1sigma >= 0.72
+        and abs(mean_signed) <= 6.0
+        and rmse <= 12.0
+    ):
+        exploit_count = 11
+        triggered.append("coverage_1sigma_ge_0.72_and_abs_mean_signed_residual_le_6_and_rmse_le_12")
+    if (
+        np.isfinite(coverage_1sigma)
+        and np.isfinite(mean_signed)
+        and np.isfinite(rmse)
+        and coverage_1sigma >= 0.78
+        and abs(mean_signed) <= 5.0
+        and rmse <= 10.0
+    ):
+        exploit_count = 12
+        triggered.append("coverage_1sigma_ge_0.78_and_abs_mean_signed_residual_le_5_and_rmse_le_10")
+
+    exploit_count = int(max(MIN_EXPLOIT_COUNT, min(MAX_EXPLOIT_COUNT, exploit_count)))
+    explore_count = int(TOTAL_COUNT - exploit_count)
+    local_ratio = 0.45 if exploit_count <= 5 else 0.60
+    local_rank_probe_count = int(round(explore_count * local_ratio))
+    local_rank_probe_count = int(max(0, min(explore_count, local_rank_probe_count)))
+    blindspot_probe_count = int(explore_count - local_rank_probe_count)
+
+    return {
+        "policy": ADAPTIVE_SPLIT_POLICY,
+        "diagnostics": diagnostics,
+        "triggered_rules": triggered,
+        "exploit_count": exploit_count,
+        "explore_count": explore_count,
+        "local_rank_probe_count": local_rank_probe_count,
+        "blindspot_probe_count": blindspot_probe_count,
+    }
 
 
 def round_or_none(value: float, digits: int = 4) -> Optional[float]:
@@ -194,12 +343,20 @@ def chemistry_family(row: pd.Series, feature_names: Sequence[str]) -> str:
     return "+".join(sorted(cleaned))
 
 
-def predict(model, scaler, X: np.ndarray, is_composite_model: bool) -> Tuple[np.ndarray, np.ndarray]:
+def predict(
+    model,
+    scaler,
+    X: np.ndarray,
+    is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Predict mean and uncertainty for an unscaled feature matrix."""
     if is_composite_model:
-        return model.predict(X, return_std=True)
-    X_scaled = scaler.transform(X)
-    return model.predict(X_scaled, return_std=True)
+        mean, std = model.predict(X, return_std=True)
+    else:
+        X_scaled = scaler.transform(X)
+        mean, std = model.predict(X_scaled, return_std=True)
+    return apply_prediction_calibration(mean, std, metadata)
 
 
 def discover_iteration_dirs(stage: int) -> List[str]:
@@ -395,6 +552,7 @@ def build_bo_context(active_stage: StageArtifacts) -> BayesianOptimizer:
         active_stage.feature_names,
         config=config,
         is_composite=active_stage.is_composite_model,
+        metadata=active_stage.metadata,
     )
     optimizer._fit_search_context(active_stage.observed_context.copy())
     return optimizer
@@ -477,6 +635,7 @@ def compute_stage_batch(
         stage_artifacts.scaler,
         X_stage,
         stage_artifacts.is_composite_model,
+        metadata=stage_artifacts.metadata,
     )
     batch["predicted_stage_model"] = predicted
     batch["uncertainty_stage_model"] = uncertainty
@@ -494,6 +653,7 @@ def compute_stage_batch(
             active_stage.scaler,
             X_active,
             active_stage.is_composite_model,
+            metadata=active_stage.metadata,
         )
         batch["predicted_active_model"] = active_predicted
         batch["uncertainty_active_model"] = active_uncertainty
@@ -946,6 +1106,7 @@ def score_records_with_active_model(
         active_stage.scaler,
         X,
         active_stage.is_composite_model,
+        metadata=active_stage.metadata,
     )
     scored["predicted_viability"] = pred_mean
     scored["uncertainty"] = pred_std
@@ -1558,6 +1719,7 @@ def validate_output_rows(
         active_stage.scaler,
         X,
         active_stage.is_composite_model,
+        metadata=active_stage.metadata,
     )
 
     for idx, row in enumerate(rows):
@@ -1605,6 +1767,7 @@ def build_summary_text(
     pair_signal: Dict[Tuple[str, str], float],
     exploration_audit: Dict[str, object],
     blindspot_audit: Dict[str, object],
+    split_decision: Dict[str, object],
     batch_recommendations: Sequence[Dict[str, object]],
 ) -> str:
     """Render a human-readable summary."""
@@ -1631,6 +1794,10 @@ def build_summary_text(
     blindspot_stage_range = blindspot_audit["blindspot_stage_range"]
     generated_anchor_stage_range = exploration_audit.get("generated_anchor_stage_range", [])
     generated_anchor_stage_counts = exploration_audit.get("generated_anchor_stage_counts", {})
+    split_diagnostics = split_decision.get("diagnostics", {})
+    split_rmse = split_diagnostics.get("rmse")
+    split_mean_signed = split_diagnostics.get("mean_signed_residual")
+    split_cov1 = split_diagnostics.get("coverage_1sigma")
 
     lines = [
         "=" * 80,
@@ -1639,7 +1806,21 @@ def build_summary_text(
         f"Target stage: {format_stage_label(active_stage.stage, active_stage.iteration_dir)}",
         f"Residual feedback stage: {format_stage_label(previous_stage.stage, previous_stage.iteration_dir)}",
         f"Blind-spot signal stages: {blindspot_stage_range[0]} to {blindspot_stage_range[1]}",
+        (
+            f"Adaptive split policy: {split_decision.get('policy', 'none')}"
+            f" (rmse={split_rmse:.3f}, mean_residual={split_mean_signed:+.3f}, coverage@1σ={split_cov1:.3f})"
+            if all(
+                np.isfinite(value)
+                for value in [split_rmse, split_mean_signed, split_cov1]
+            )
+            else f"Adaptive split policy: {split_decision.get('policy', 'none')} (insufficient diagnostics)"
+        ),
         f"Output split: {EXPLOIT_COUNT} exploitation + {EXPLORE_COUNT} exploration",
+        (
+            "Adaptive split triggered rules: " + ", ".join(split_decision.get("triggered_rules", []))
+            if split_decision.get("triggered_rules")
+            else "Adaptive split triggered rules: none"
+        ),
         "Positive residual thresholds tried: " + ", ".join(f"{threshold:.1f}" for threshold in thresholds_tried),
         f"Selected positive residual threshold: {selected_threshold:.1f}",
         f"Residual threshold relaxation: {threshold_note}",
@@ -1736,6 +1917,7 @@ def preflight_report(
     optimizer: BayesianOptimizer,
     exploration_audit: Dict[str, object],
     blindspot_audit: Dict[str, object],
+    split_decision: Dict[str, object],
 ) -> Dict:
     """Build the machine-readable input validation report."""
     return {
@@ -1755,6 +1937,13 @@ def preflight_report(
         "observed_context_rows": int(len(active_stage.observed_context)),
         "effective_max_ingredients": int(optimizer.effective_max_ingredients),
         "dmso_cap_percent": float(optimizer.config.max_dmso_percent),
+        "adaptive_split_policy": str(split_decision.get("policy", ADAPTIVE_SPLIT_POLICY)),
+        "adaptive_split_diagnostics": dict(split_decision.get("diagnostics", {})),
+        "adaptive_split_triggered_rules": list(split_decision.get("triggered_rules", [])),
+        "exploit_count": int(EXPLOIT_COUNT),
+        "explore_count": int(EXPLORE_COUNT),
+        "local_rank_probe_target_count": int(LOCAL_RANK_PROBE_COUNT),
+        "blindspot_probe_target_count": int(BLINDSPOT_PROBE_COUNT),
         "feature_names": list(active_stage.feature_names),
         "positive_residual_thresholds_tried": list(exploration_audit["positive_residual_thresholds_tried"]),
         "selected_positive_residual_threshold": float(exploration_audit["selected_positive_residual_threshold"]),
@@ -2099,6 +2288,13 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         raise ValidationError("Active and previous-stage feature spaces do not match.")
 
     previous_batch = compute_previous_stage_batch(validation_df, previous_stage)
+    split_decision = choose_adaptive_split(previous_batch)
+    set_runtime_split_counts(
+        split_decision["exploit_count"],
+        split_decision["explore_count"],
+        split_decision["local_rank_probe_count"],
+        split_decision["blindspot_probe_count"],
+    )
     historical_residual_df = build_historical_residual_df(validation_df, active_stage, completed_stages)
     optimizer = build_bo_context(active_stage)
     candidate_pool, candidate_paths = load_bo_candidate_pool(active_stage, validation_df)
@@ -2188,6 +2384,7 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         optimizer,
         exploration_audit,
         blindspot_audit,
+        split_decision,
     )
 
     summary_text = build_summary_text(
@@ -2199,6 +2396,7 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         pair_signal,
         exploration_audit,
         blindspot_audit,
+        split_decision,
         batch_recommendations,
     )
     metadata = {
@@ -2222,8 +2420,13 @@ def generate_next_formulations(stage_override: Optional[int], overwrite: bool) -
         "generated_top_anchor_pairs": list(exploration_audit.get("generated_top_anchor_pairs", [])),
         "meaningful_actual_min": MEANINGFUL_ACTUAL_MIN,
         "min_exploration_prediction": MIN_EXPLORATION_PREDICTION,
+        "adaptive_split_policy": str(split_decision["policy"]),
+        "adaptive_split_diagnostics": dict(split_decision["diagnostics"]),
+        "adaptive_split_triggered_rules": list(split_decision["triggered_rules"]),
         "exploit_count": EXPLOIT_COUNT,
         "explore_count": EXPLORE_COUNT,
+        "local_rank_probe_target_count": LOCAL_RANK_PROBE_COUNT,
+        "blindspot_probe_target_count": BLINDSPOT_PROBE_COUNT,
         "effective_max_ingredients": int(optimizer.effective_max_ingredients),
         "dmso_cap_percent": float(optimizer.config.max_dmso_percent),
         "candidate_files": [str(path.relative_to(PROJECT_ROOT)) for path in candidate_paths],

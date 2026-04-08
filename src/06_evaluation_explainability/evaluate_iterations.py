@@ -39,9 +39,34 @@ MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
 LITERATURE_ONLY_DIR = os.path.join(MODELS_DIR, "literature_only")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 VALIDATION_PATH = os.path.join(PROJECT_ROOT, "data", "validation", "validation_results.csv")
+EVALUATION_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "processed", "evaluation_data.csv")
 OUTPUT_DIR = os.path.join(RESULTS_DIR, "evaluation")
 PLOT_PATH = os.path.join(OUTPUT_DIR, "stage_performance.png")
 NEXT_FORMULATIONS_PLOT_PATH = os.path.join(OUTPUT_DIR, "next_formulations_performance.png")
+SINGLE_OBJECTIVE_PROGRESS_PLOT_PATH = os.path.join(OUTPUT_DIR, "single_objective_progress.png")
+SINGLE_OBJECTIVE_PROGRESS_CSV_PATH = os.path.join(OUTPUT_DIR, "single_objective_progress_metrics.csv")
+FIGURE7_STYLE_PLOT_PATH = os.path.join(OUTPUT_DIR, "figure7_style_ectoin_ucb.png")
+FIGURE7_STYLE_CSV_PATH = os.path.join(OUTPUT_DIR, "figure7_style_ectoin_ucb_slice_data.csv")
+FIGURE7_FEATURE = "ectoin_M"
+FIGURE7_GRID_POINTS = 200
+FIGURE7_UCB_KAPPA = 0.5
+POPPY_COLORBLIND_PALETTE = {
+    "poppy": "#D55E00",
+    "blue": "#0072B2",
+    "teal": "#009E73",
+    "purple": "#CC79A7",
+    "gold": "#E69F00",
+    "sky": "#56B4E9",
+    "gray": "#7A7A7A",
+}
+POPPY_COLORBLIND_CYCLE = [
+    POPPY_COLORBLIND_PALETTE["poppy"],
+    POPPY_COLORBLIND_PALETTE["blue"],
+    POPPY_COLORBLIND_PALETTE["teal"],
+    POPPY_COLORBLIND_PALETTE["purple"],
+    POPPY_COLORBLIND_PALETTE["gold"],
+    POPPY_COLORBLIND_PALETTE["sky"],
+]
 HELPER_DIR = os.path.join(PROJECT_ROOT, "src", "helper")
 VALIDATION_LOOP_DIR = os.path.join(PROJECT_ROOT, "src", "04_validation_loop")
 
@@ -59,6 +84,7 @@ from formulation_formatting import (  # noqa: E402
     format_formulation,
     normalize_formulation_dataframe,
 )
+from prediction_calibration import apply_prediction_calibration  # noqa: E402
 from update_model_weighted_prior import CompositeGP  # noqa: F401,E402
 
 
@@ -73,6 +99,7 @@ class StageRecord:
     is_composite_model: bool
     feature_names: List[str]
     model_loader: str
+    metadata: Dict[str, object]
 
 
 EXPERIMENT_ID_PATTERN = re.compile(r"(\d+)")
@@ -125,6 +152,102 @@ def load_validation_df() -> pd.DataFrame:
     return validation_df
 
 
+def load_literature_df() -> pd.DataFrame:
+    """Load literature formulations used as stage-agnostic background data."""
+    if not os.path.exists(EVALUATION_DATA_PATH):
+        return pd.DataFrame()
+    literature_df = pd.read_csv(EVALUATION_DATA_PATH)
+    if "source" not in literature_df.columns or "viability_percent" not in literature_df.columns:
+        return pd.DataFrame()
+    source_series = literature_df["source"].astype(str).str.strip().str.lower()
+    literature_df = literature_df[source_series == "literature"].copy()
+    literature_df["viability_measured"] = pd.to_numeric(
+        literature_df["viability_percent"], errors="coerce"
+    )
+    literature_df = literature_df[literature_df["viability_measured"].notna()].copy()
+    literature_df["training_source"] = "literature"
+    return literature_df
+
+
+def build_stage_training_df(
+    stage_record: StageRecord,
+    feature_names: Sequence[str],
+    validation_df: pd.DataFrame,
+    literature_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Reconstruct training rows for one stage from literature + cumulative wet-lab."""
+    pieces: List[pd.DataFrame] = []
+    if not literature_df.empty:
+        pieces.append(literature_df.copy())
+
+    stage_series = validation_df["experiment_id"].map(stage_from_experiment_id)
+    wetlab_mask = stage_series.notna() & (stage_series <= int(stage_record.stage))
+    wetlab_df = validation_df[wetlab_mask].copy()
+    if not wetlab_df.empty:
+        wetlab_df["training_source"] = "wetlab"
+        pieces.append(wetlab_df)
+
+    if not pieces:
+        return pd.DataFrame(columns=list(feature_names) + ["viability_measured", "training_source"])
+
+    training_df = pd.concat(pieces, ignore_index=True, sort=False)
+    for feature_name in feature_names:
+        if feature_name not in training_df.columns:
+            training_df[feature_name] = 0.0
+        training_df[feature_name] = pd.to_numeric(training_df[feature_name], errors="coerce").fillna(0.0)
+
+    training_df["viability_measured"] = pd.to_numeric(
+        training_df["viability_measured"], errors="coerce"
+    )
+    training_df = training_df[training_df["viability_measured"].notna()].copy()
+    return training_df
+
+
+def select_figure7_stage_triplet(
+    stage_payloads: Sequence[Tuple[StageRecord, pd.DataFrame]],
+) -> List[Tuple[StageRecord, pd.DataFrame]]:
+    """Pick earliest / median / latest stage payloads with data."""
+    ordered = sorted(stage_payloads, key=lambda item: int(item[0].stage))
+    if not ordered:
+        return []
+    if len(ordered) == 1:
+        return [ordered[0], ordered[0], ordered[0]]
+    if len(ordered) == 2:
+        return [ordered[0], ordered[1], ordered[1]]
+    return [ordered[0], ordered[len(ordered) // 2], ordered[-1]]
+
+
+def compute_slice_range(
+    stage_series: pd.Series,
+    global_series: pd.Series,
+) -> Tuple[float, float]:
+    """Compute a robust x-axis range for 1D sweep plots."""
+    stage_values = pd.to_numeric(stage_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if stage_values.empty:
+        stage_values = pd.to_numeric(global_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if stage_values.empty:
+        return 0.0, 1.0
+    minimum = float(stage_values.min())
+    maximum = float(stage_values.max())
+    if not math.isfinite(minimum) or not math.isfinite(maximum):
+        return 0.0, 1.0
+    if maximum - minimum > 1e-12:
+        return minimum, maximum
+
+    fallback_values = pd.to_numeric(global_series, errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    if fallback_values.empty:
+        center = minimum
+        span = max(abs(center) * 0.2, 0.1)
+        return max(0.0, center - span), center + span
+    fallback_min = float(fallback_values.min())
+    fallback_max = float(fallback_values.max())
+    if math.isfinite(fallback_min) and math.isfinite(fallback_max) and (fallback_max - fallback_min > 1e-12):
+        return fallback_min, fallback_max
+    center = minimum
+    span = max(abs(center) * 0.2, 0.1)
+    return max(0.0, center - span), center + span
+
+
 def discover_iteration_checkpoints() -> List[StageRecord]:
     """Collect saved iteration checkpoints with metadata."""
     records: List[StageRecord] = []
@@ -158,6 +281,7 @@ def discover_iteration_checkpoints() -> List[StageRecord]:
                 is_composite_model=bool(metadata.get("is_composite_model", False)),
                 feature_names=list(metadata["feature_names"]),
                 model_loader="composite" if bool(metadata.get("is_composite_model", False)) else "standard",
+                metadata=dict(metadata),
             )
         )
 
@@ -186,6 +310,7 @@ def build_stage_records() -> List[StageRecord]:
             is_composite_model=False,
             feature_names=list(metadata["feature_names"]),
             model_loader="standard",
+            metadata=dict(metadata),
         )
     else:
         first_iteration = iteration_records[0]
@@ -199,6 +324,7 @@ def build_stage_records() -> List[StageRecord]:
             is_composite_model=False,
             feature_names=first_iteration.feature_names,
             model_loader="literature_component",
+            metadata=dict(first_iteration.metadata),
         )
     return [literature_stage] + iteration_records
 
@@ -219,12 +345,20 @@ def load_model(stage_record: StageRecord):
     return gp, scaler
 
 
-def predict(model, scaler, X: np.ndarray, is_composite_model: bool) -> Tuple[np.ndarray, np.ndarray]:
+def predict(
+    model,
+    scaler,
+    X: np.ndarray,
+    is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Predict mean and standard deviation for one feature matrix."""
     if is_composite_model:
-        return model.predict(X, return_std=True)
-    X_scaled = scaler.transform(X)
-    return model.predict(X_scaled, return_std=True)
+        mean, std = model.predict(X, return_std=True)
+    else:
+        X_scaled = scaler.transform(X)
+        mean, std = model.predict(X_scaled, return_std=True)
+    return apply_prediction_calibration(mean, std, metadata)
 
 
 def evaluate_predictions(
@@ -233,6 +367,7 @@ def evaluate_predictions(
     feature_names: Sequence[str],
     eval_df: pd.DataFrame,
     is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
 ) -> Dict[str, Optional[float]]:
     """Compute predictive metrics for one held-out wet-lab slice."""
     if eval_df.empty:
@@ -252,7 +387,7 @@ def evaluate_predictions(
 
     X = eval_df.reindex(columns=feature_names, fill_value=0.0).fillna(0.0).to_numpy(float)
     y = eval_df["viability_measured"].to_numpy(float)
-    pred_mean, pred_std = predict(model, scaler, X, is_composite_model)
+    pred_mean, pred_std = predict(model, scaler, X, is_composite_model, metadata=metadata)
 
     rmse = float(np.sqrt(np.mean((y - pred_mean) ** 2)))
     mae = float(np.mean(np.abs(y - pred_mean)))
@@ -375,6 +510,7 @@ def rescore_candidate_df(
     model,
     scaler,
     is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
 ) -> pd.DataFrame:
     """Normalize candidate rows, recompute scores, and derive an effective rank."""
     rescored = align_candidate_df(candidate_df, feature_names).copy()
@@ -386,7 +522,7 @@ def rescore_candidate_df(
     rescored["source_rank"] = source_rank.astype(int)
 
     X = rescored.reindex(columns=feature_names, fill_value=0.0).fillna(0.0).to_numpy(float)
-    pred_mean, pred_std = predict(model, scaler, X, is_composite_model)
+    pred_mean, pred_std = predict(model, scaler, X, is_composite_model, metadata=metadata)
     rescored["predicted_viability"] = pred_mean
     rescored["uncertainty"] = pred_std
     rescored = rescored.sort_values(
@@ -404,11 +540,12 @@ def rescore_next_formulations_df(
     model,
     scaler,
     is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
 ) -> pd.DataFrame:
     """Rescore `07` output rows with the frozen stage model."""
     rescored = align_next_formulations_df(output_df, feature_names).copy()
     X = rescored.reindex(columns=feature_names, fill_value=0.0).fillna(0.0).to_numpy(float)
-    pred_mean, pred_std = predict(model, scaler, X, is_composite_model)
+    pred_mean, pred_std = predict(model, scaler, X, is_composite_model, metadata=metadata)
     rescored["predicted_viability"] = pred_mean
     rescored["uncertainty"] = pred_std
     rescored["formulation"] = [
@@ -424,6 +561,7 @@ def summarize_candidate_hits(
     model,
     scaler,
     is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     """Evaluate one frozen candidate file against later wet-lab matches."""
     candidate_df = pd.read_csv(candidate_path)
@@ -433,6 +571,7 @@ def summarize_candidate_hits(
         model,
         scaler,
         is_composite_model,
+        metadata=metadata,
     ).fillna(0.0)
     lookup = build_signature_lookup(future_validation_df, feature_names)
 
@@ -549,6 +688,7 @@ def summarize_next_formulations_hits(
     model,
     scaler,
     is_composite_model: bool,
+    metadata: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     """Evaluate one `07` output slate against later wet-lab matches."""
     output_df = pd.read_csv(output_path)
@@ -558,6 +698,7 @@ def summarize_next_formulations_hits(
         model,
         scaler,
         is_composite_model,
+        metadata=metadata,
     ).fillna(0.0)
     output_df["output_row_id"] = np.arange(len(output_df))
     lookup = build_signature_lookup(future_validation_df, feature_names)
@@ -668,6 +809,7 @@ def evaluate_stage(stage_record: StageRecord, validation_df: pd.DataFrame) -> Di
             model,
             scaler,
             stage_record.is_composite_model,
+            metadata=stage_record.metadata,
         )
         for path in candidate_files_for_stage(stage_record.stage)
     ]
@@ -679,10 +821,15 @@ def evaluate_stage(stage_record: StageRecord, validation_df: pd.DataFrame) -> Di
             model,
             scaler,
             stage_record.is_composite_model,
+            metadata=stage_record.metadata,
         )
         if next_formulations_path
         else None
     )
+
+    batch_best_actual_viability: Optional[float] = None
+    if not batch_df.empty:
+        batch_best_actual_viability = round_or_none(float(batch_df["viability_measured"].max()))
 
     return {
         "stage": stage_record.stage,
@@ -693,16 +840,64 @@ def evaluate_stage(stage_record: StageRecord, validation_df: pd.DataFrame) -> Di
         "is_composite_model": stage_record.is_composite_model,
         "batch_dates": sorted({str(value.date()) for value in batch_df["parsed_date"].dropna().tolist()}),
         "batch_rows": int(len(batch_df)),
+        "batch_best_actual_viability": batch_best_actual_viability,
         "batch_metrics": evaluate_predictions(
             model,
             scaler,
             stage_record.feature_names,
             batch_df,
             stage_record.is_composite_model,
+            metadata=stage_record.metadata,
         ),
         "candidate_evaluation": candidate_summaries,
         "next_formulations_evaluation": next_formulations_evaluation,
     }
+
+
+def compute_single_objective_progress(
+    results: Sequence[Dict[str, object]],
+) -> List[Dict[str, Optional[float]]]:
+    """Compute stage-wise best-so-far viability and simple regret."""
+    if not results:
+        return []
+
+    ordered_results = sorted(results, key=lambda record: int(record["stage"]))
+    measured_stage_bests = [
+        float(record["batch_best_actual_viability"])
+        for record in ordered_results
+        if record.get("batch_best_actual_viability") is not None
+        and math.isfinite(float(record["batch_best_actual_viability"]))
+    ]
+    if not measured_stage_bests:
+        return []
+
+    best_known_viability = float(np.max(measured_stage_bests))
+    running_best: Optional[float] = None
+    progress_rows: List[Dict[str, Optional[float]]] = []
+
+    for record in ordered_results:
+        stage_best_raw = record.get("batch_best_actual_viability")
+        stage_best: Optional[float] = None
+        if stage_best_raw is not None:
+            candidate = float(stage_best_raw)
+            if math.isfinite(candidate):
+                stage_best = candidate
+                running_best = candidate if running_best is None else max(running_best, candidate)
+
+        best_so_far = None if running_best is None else float(running_best)
+        simple_regret = None if best_so_far is None else float(max(best_known_viability - best_so_far, 0.0))
+
+        progress_rows.append(
+            {
+                "stage": int(record["stage"]),
+                "stage_best_actual_viability": round_or_none(stage_best),
+                "best_so_far_viability": round_or_none(best_so_far),
+                "simple_regret_vs_best_known": round_or_none(simple_regret),
+                "best_known_viability_reference": round_or_none(best_known_viability),
+            }
+        )
+
+    return progress_rows
 
 
 def print_summary(results: Sequence[Dict[str, object]]):
@@ -783,6 +978,9 @@ def write_outputs(results: Sequence[Dict[str, object]]):
     with open(json_path, "w") as handle:
         json.dump(list(results), handle, indent=2)
 
+    progress_rows = compute_single_objective_progress(results)
+    progress_by_stage = {int(row["stage"]): row for row in progress_rows}
+
     rows: List[dict] = []
     for result in results:
         batch_metrics = result["batch_metrics"]
@@ -790,6 +988,7 @@ def write_outputs(results: Sequence[Dict[str, object]]):
         next_by_type = next_eval.get("by_recommendation_type", {})
         exploit = next_by_type.get("exploit", {})
         explore = next_by_type.get("explore", {})
+        progress = progress_by_stage.get(int(result["stage"]), {})
         rows.append(
             {
                 "stage": result["stage"],
@@ -799,6 +998,10 @@ def write_outputs(results: Sequence[Dict[str, object]]):
                 "model_method": result["model_method"],
                 "batch_dates": ",".join(result["batch_dates"]),
                 "batch_rows": batch_metrics["n_rows"],
+                "batch_best_actual_viability": progress.get("stage_best_actual_viability"),
+                "best_so_far_viability": progress.get("best_so_far_viability"),
+                "simple_regret_vs_best_known": progress.get("simple_regret_vs_best_known"),
+                "best_known_viability_reference": progress.get("best_known_viability_reference"),
                 "batch_rmse": batch_metrics["rmse"],
                 "batch_spearman": batch_metrics["spearman_rho"],
                 "batch_hit_rate_ge_50": batch_metrics["hit_rate_ge_50"],
@@ -813,6 +1016,18 @@ def write_outputs(results: Sequence[Dict[str, object]]):
 
     pd.DataFrame(rows).to_csv(
         os.path.join(OUTPUT_DIR, "iteration_prospective_metrics.csv"),
+        index=False,
+    )
+
+    progress_columns = [
+        "stage",
+        "stage_best_actual_viability",
+        "best_so_far_viability",
+        "simple_regret_vs_best_known",
+        "best_known_viability_reference",
+    ]
+    pd.DataFrame(progress_rows, columns=progress_columns).to_csv(
+        SINGLE_OBJECTIVE_PROGRESS_CSV_PATH,
         index=False,
     )
 
@@ -1049,7 +1264,10 @@ def write_next_formulations_plot(results: Sequence[Dict[str, object]]):
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
     axes = axes.flatten()
-    colors = {"exploit": "#1f6aa5", "explore": "#d66a1f"}
+    colors = {
+        "exploit": POPPY_COLORBLIND_PALETTE["blue"],
+        "explore": POPPY_COLORBLIND_PALETTE["poppy"],
+    }
     labels = [row["label"] for row in plot_rows]
     x = np.arange(len(labels))
     width = float(np.clip(2.8 / max(len(labels), 1), 0.12, 0.34))
@@ -1126,6 +1344,359 @@ def write_next_formulations_plot(results: Sequence[Dict[str, object]]):
     plt.close(fig)
 
 
+def write_single_objective_progress_plot(results: Sequence[Dict[str, object]]):
+    """Plot best-so-far viability and simple regret versus iteration."""
+    progress_rows = compute_single_objective_progress(results)
+
+    plt.style.use("seaborn-v0_8-whitegrid")
+    if not progress_rows:
+        fig, ax = plt.subplots(figsize=(12, 5.5))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No measured wet-lab stages are available to compute progress curves yet.",
+            ha="center",
+            va="center",
+            fontsize=15,
+        )
+        fig.tight_layout()
+        fig.savefig(SINGLE_OBJECTIVE_PROGRESS_PLOT_PATH, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        return
+
+    progress_df = pd.DataFrame(progress_rows)
+    progress_df = progress_df.sort_values("stage")
+
+    x = progress_df["stage"].to_numpy(dtype=int)
+    labels = [str(int(stage)) for stage in x]
+    stage_best = progress_df["stage_best_actual_viability"].to_numpy(dtype=float)
+    best_so_far = progress_df["best_so_far_viability"].to_numpy(dtype=float)
+    simple_regret = progress_df["simple_regret_vs_best_known"].to_numpy(dtype=float)
+    best_known = progress_df["best_known_viability_reference"].to_numpy(dtype=float)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6.5))
+
+    best_ax = axes[0]
+    best_ax.plot(
+        x,
+        best_so_far,
+        color=POPPY_COLORBLIND_PALETTE["poppy"],
+        marker="o",
+        linewidth=2.8,
+        markersize=7,
+        label="Best-so-far viability",
+    )
+    measured_mask = np.isfinite(stage_best)
+    if np.any(measured_mask):
+        best_ax.scatter(
+            x[measured_mask],
+            stage_best[measured_mask],
+            color=POPPY_COLORBLIND_PALETTE["blue"],
+            s=56,
+            alpha=0.9,
+            label="Stage best viability",
+        )
+    if np.any(np.isfinite(best_known)):
+        best_ax.axhline(
+            float(np.nanmax(best_known)),
+            color=POPPY_COLORBLIND_PALETTE["gray"],
+            linestyle="--",
+            linewidth=1.4,
+            label="Best known reference",
+        )
+    best_ax.set_title("Best-So-Far Viability", fontsize=18, fontweight="semibold")
+    best_ax.set_xlabel("Iteration", fontsize=14)
+    best_ax.set_ylabel("Viability (%)", fontsize=14)
+    best_ax.set_xticks(x, labels)
+    best_ax.tick_params(axis="both", labelsize=12)
+    best_ax.legend(frameon=False, fontsize=11, loc="lower right")
+
+    regret_ax = axes[1]
+    regret_ax.plot(
+        x,
+        simple_regret,
+        color=POPPY_COLORBLIND_PALETTE["blue"],
+        marker="o",
+        linewidth=2.8,
+        markersize=7,
+        label="Simple regret",
+    )
+    regret_ax.fill_between(
+        x,
+        simple_regret,
+        0.0,
+        color=POPPY_COLORBLIND_PALETTE["blue"],
+        alpha=0.15,
+    )
+    regret_ax.axhline(0.0, color=POPPY_COLORBLIND_PALETTE["gray"], linestyle="--", linewidth=1.2)
+    regret_ax.set_title("Simple Regret vs Best Known", fontsize=18, fontweight="semibold")
+    regret_ax.set_xlabel("Iteration", fontsize=14)
+    regret_ax.set_ylabel("Regret (% viability)", fontsize=14)
+    regret_ax.set_xticks(x, labels)
+    regret_ax.tick_params(axis="both", labelsize=12)
+    regret_ax.set_ylim(bottom=0.0)
+    regret_ax.legend(frameon=False, fontsize=11, loc="upper right")
+
+    fig.tight_layout()
+    fig.savefig(SINGLE_OBJECTIVE_PROGRESS_PLOT_PATH, dpi=200, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+
+
+def write_figure7_style_ectoin_ucb_plot(
+    stage_records: Sequence[StageRecord],
+    validation_df: pd.DataFrame,
+):
+    """Render a Figure-7-style empirical 1D slice across early/mid/late stages."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    literature_df = load_literature_df()
+    global_x_sources: List[pd.Series] = []
+    if FIGURE7_FEATURE in literature_df.columns:
+        global_x_sources.append(literature_df[FIGURE7_FEATURE])
+    if FIGURE7_FEATURE in validation_df.columns:
+        global_x_sources.append(validation_df[FIGURE7_FEATURE])
+    global_x = (
+        pd.concat(global_x_sources, ignore_index=True)
+        if global_x_sources
+        else pd.Series(dtype=float)
+    )
+
+    stage_payloads: List[Tuple[StageRecord, pd.DataFrame]] = []
+    for stage_record in stage_records:
+        if FIGURE7_FEATURE not in stage_record.feature_names:
+            continue
+        training_df = build_stage_training_df(
+            stage_record=stage_record,
+            feature_names=stage_record.feature_names,
+            validation_df=validation_df,
+            literature_df=literature_df,
+        )
+        if training_df.empty:
+            continue
+        stage_payloads.append((stage_record, training_df))
+
+    selected_payloads = select_figure7_stage_triplet(stage_payloads)
+    csv_rows: List[Dict[str, object]] = []
+    csv_columns = [
+        "panel_row",
+        "stage",
+        "label",
+        "iteration_dir",
+        "x_feature",
+        "x_value",
+        "predicted_mean",
+        "predicted_std",
+        "ucb",
+        "is_selected",
+        "training_points",
+        "anchor_mode",
+        "acquisition",
+        "kappa",
+    ]
+
+    plt.style.use("seaborn-v0_8-whitegrid")
+    panel_labels = ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)"]
+
+    if not selected_payloads:
+        fig, ax = plt.subplots(figsize=(14, 8))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No stage data available for Figure-7-style ectoin/UCB slice plot.",
+            ha="center",
+            va="center",
+            fontsize=16,
+        )
+        fig.tight_layout()
+        fig.savefig(FIGURE7_STYLE_PLOT_PATH, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        pd.DataFrame(columns=csv_columns).to_csv(FIGURE7_STYLE_CSV_PATH, index=False)
+        return
+
+    fig, axes = plt.subplots(3, 2, figsize=(17, 16), sharex=False)
+    axes = np.asarray(axes)
+
+    for row_idx in range(3):
+        if row_idx >= len(selected_payloads):
+            for col_idx in range(2):
+                ax = axes[row_idx, col_idx]
+                ax.axis("off")
+                panel_index = row_idx * 2 + col_idx
+                ax.text(
+                    0.5,
+                    0.5,
+                    f"{panel_labels[panel_index]} No stage available",
+                    ha="center",
+                    va="center",
+                    fontsize=14,
+                )
+            continue
+
+        stage_record, training_df = selected_payloads[row_idx]
+        model, scaler = load_model(stage_record)
+        feature_names = list(stage_record.feature_names)
+        feature_idx = feature_names.index(FIGURE7_FEATURE)
+        aligned_training = training_df.reindex(columns=feature_names, fill_value=0.0).fillna(0.0)
+        anchor = aligned_training.median(axis=0).to_numpy(dtype=float)
+        x_min, x_max = compute_slice_range(training_df[FIGURE7_FEATURE], global_x)
+        x_grid = np.linspace(x_min, x_max, FIGURE7_GRID_POINTS)
+        X_grid = np.tile(anchor, (len(x_grid), 1))
+        X_grid[:, feature_idx] = x_grid
+
+        pred_mean, pred_std = predict(
+            model=model,
+            scaler=scaler,
+            X=X_grid,
+            is_composite_model=stage_record.is_composite_model,
+            metadata=stage_record.metadata,
+        )
+        pred_mean = np.asarray(pred_mean, dtype=float)
+        pred_std = np.maximum(np.asarray(pred_std, dtype=float), 0.0)
+        ucb = pred_mean + FIGURE7_UCB_KAPPA * pred_std
+
+        finite_ucb = np.isfinite(ucb)
+        if np.any(finite_ucb):
+            selected_idx = int(np.argmax(np.where(finite_ucb, ucb, -np.inf)))
+        else:
+            selected_idx = 0
+
+        selected_x = float(x_grid[selected_idx])
+        selected_mean = float(pred_mean[selected_idx]) if np.isfinite(pred_mean[selected_idx]) else float("nan")
+        selected_ucb = float(ucb[selected_idx]) if np.isfinite(ucb[selected_idx]) else float("nan")
+
+        training_x = pd.to_numeric(training_df[FIGURE7_FEATURE], errors="coerce").to_numpy(dtype=float)
+        training_y = pd.to_numeric(training_df["viability_measured"], errors="coerce").to_numpy(dtype=float)
+        training_source = training_df["training_source"].astype(str).str.lower()
+        literature_mask = (training_source == "literature").to_numpy()
+        wetlab_mask = (training_source == "wetlab").to_numpy()
+
+        left_ax = axes[row_idx, 0]
+        right_ax = axes[row_idx, 1]
+        left_label = panel_labels[row_idx * 2]
+        right_label = panel_labels[row_idx * 2 + 1]
+
+        valid_band = np.isfinite(pred_mean) & np.isfinite(pred_std)
+        lower = pred_mean - pred_std
+        upper = pred_mean + pred_std
+        if np.any(valid_band):
+            left_ax.fill_between(
+                x_grid,
+                lower,
+                upper,
+                color=POPPY_COLORBLIND_PALETTE["sky"],
+                alpha=0.25,
+                label="GP ±1σ",
+            )
+        left_ax.plot(
+            x_grid,
+            pred_mean,
+            color=POPPY_COLORBLIND_PALETTE["blue"],
+            linewidth=2.2,
+            label="GP mean",
+        )
+        if np.any(literature_mask):
+            left_ax.scatter(
+                training_x[literature_mask],
+                training_y[literature_mask],
+                color=POPPY_COLORBLIND_PALETTE["teal"],
+                s=20,
+                alpha=0.6,
+                label="Literature points",
+            )
+        if np.any(wetlab_mask):
+            left_ax.scatter(
+                training_x[wetlab_mask],
+                training_y[wetlab_mask],
+                color=POPPY_COLORBLIND_PALETTE["purple"],
+                s=24,
+                alpha=0.75,
+                label="Wet-lab points",
+            )
+        if math.isfinite(selected_mean):
+            left_ax.scatter(
+                [selected_x],
+                [selected_mean],
+                marker="*",
+                s=180,
+                color=POPPY_COLORBLIND_PALETTE["poppy"],
+                edgecolors="black",
+                linewidths=0.5,
+                label="Selected point",
+                zorder=5,
+            )
+        left_ax.set_title(
+            f"{left_label} Stage {int(stage_record.stage)} objective slice",
+            fontsize=13,
+            fontweight="semibold",
+        )
+        left_ax.set_xlabel(FIGURE7_FEATURE, fontsize=11)
+        left_ax.set_ylabel("Viability (%)", fontsize=11)
+        left_ax.tick_params(axis="both", labelsize=10)
+        left_ax.legend(frameon=False, fontsize=9, loc="best")
+
+        right_ax.plot(
+            x_grid,
+            ucb,
+            color=POPPY_COLORBLIND_PALETTE["blue"],
+            linewidth=2.2,
+            label=f"UCB (kappa={FIGURE7_UCB_KAPPA:.1f})",
+        )
+        if math.isfinite(selected_ucb):
+            right_ax.scatter(
+                [selected_x],
+                [selected_ucb],
+                marker="*",
+                s=180,
+                color=POPPY_COLORBLIND_PALETTE["poppy"],
+                edgecolors="black",
+                linewidths=0.5,
+                label="Selected point",
+                zorder=5,
+            )
+        right_ax.set_title(
+            f"{right_label} Stage {int(stage_record.stage)} acquisition slice",
+            fontsize=13,
+            fontweight="semibold",
+        )
+        right_ax.set_xlabel(FIGURE7_FEATURE, fontsize=11)
+        right_ax.set_ylabel("Acquisition value", fontsize=11)
+        right_ax.tick_params(axis="both", labelsize=10)
+        right_ax.legend(frameon=False, fontsize=9, loc="best")
+
+        for idx, x_value in enumerate(x_grid):
+            csv_rows.append(
+                {
+                    "panel_row": row_idx + 1,
+                    "stage": int(stage_record.stage),
+                    "label": stage_record.label,
+                    "iteration_dir": stage_record.iteration_dir,
+                    "x_feature": FIGURE7_FEATURE,
+                    "x_value": float(x_value),
+                    "predicted_mean": round_or_none(pred_mean[idx], digits=6),
+                    "predicted_std": round_or_none(pred_std[idx], digits=6),
+                    "ucb": round_or_none(ucb[idx], digits=6),
+                    "is_selected": bool(idx == selected_idx),
+                    "training_points": int(len(training_df)),
+                    "anchor_mode": "median_profile",
+                    "acquisition": "ucb",
+                    "kappa": FIGURE7_UCB_KAPPA,
+                }
+            )
+
+    fig.suptitle(
+        "Figure-7-style Cryo empirical slices (ectoin_M, median anchor, UCB)",
+        fontsize=16,
+        fontweight="bold",
+        y=0.995,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.985])
+    fig.savefig(FIGURE7_STYLE_PLOT_PATH, dpi=220, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+    pd.DataFrame(csv_rows, columns=csv_columns).to_csv(FIGURE7_STYLE_CSV_PATH, index=False)
+
+
 def main():
     """Run stage-based evaluation."""
     validation_df = load_validation_df()
@@ -1138,6 +1709,8 @@ def main():
     write_outputs(results)
     write_performance_plot(results)
     write_next_formulations_plot(results)
+    write_single_objective_progress_plot(results)
+    write_figure7_style_ectoin_ucb_plot(stage_records, validation_df)
 
 
 if __name__ == "__main__":

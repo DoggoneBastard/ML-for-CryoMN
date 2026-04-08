@@ -88,6 +88,8 @@ by completed wet-lab stages.
 - Composite iterations are strict: if metadata says composite, the shared resolver will not fall back to a standard GP automatically.
 - `03_optimization`, `05_bo_optimization`, and `06_evaluation_explainability` all load the same iteration-aware observed context, and reconstruct it from literature + validation inputs on demand if the artifact is missing.
 - `05_bo_optimization` uses analytic wet-lab weights from the observed context when calibrating BO support geometry, instead of relying on literal duplicate rows.
+- `04_validation_loop/update_model_weighted_prior.py` auto-selects literature/wet-lab noise levels from fixed alpha grids and writes calibration metadata (`bias_shift_percent`, `uncertainty_scale`, coverage diagnostics) into the active model metadata.
+- `05`, `06`, and `07` apply the same metadata-driven prediction calibration path so acquisition, evaluation, and next-batch selection are consistent.
 - `03`, `05`, `06`, and `07` share a practical concentration floor for formulation identity: values below `0.1%` or below `1.0 mM` are treated as absent when generating candidates, matching hits, and rendering formulation strings.
 - The repository does not rely on one permanent static train/test split. The update scripts estimate wet-lab generalization with K-fold cross-validation over wet-lab rows only, while retaining all literature rows in training for every fold.
 - In code, the wet-lab fold count is `min(5, len(X_val))` with `shuffle=True` and `random_state=42`. In the saved iterations in this repo that behaves as 5-fold CV, because every completed wet-lab stage has at least 5 measured rows.
@@ -126,10 +128,11 @@ python src/07_next_formulations/next_formulations.py
 This script:
 - resolves the active iteration automatically
 - requires validation coverage through stage `N-1` when targeting stage `N`
-- uses `05` BO outputs for 8 exploitation picks
+- uses `05` BO outputs as the exploitation source pool
 - normalizes existing and newly generated candidates so trace ingredients below `0.1%` or `1.0 mM` are treated as absent
+- chooses exploit/explore counts adaptively from the previous completed stage diagnostics (default `8/12`, bounded to exploit `4..12`, total always `20`)
 - adaptively relaxes the positive-residual anchor threshold when stronger anchors are unavailable
-- builds 12 exploration/calibration rows as 8 local-rank probes plus 4 blind-spot probes, then uses BO fallback only if needed
+- fills the exploration remainder with local-rank and blind-spot probes using an adaptive local/blindspot target, then uses BO fallback only if needed
 - allows exploration probes to anchor from any historical positive-residual wet-lab stage
 - writes recommended batch subsets for wet-lab capacities from 6 to 12 formulations
 - validates inputs before generation and validates all 20 outputs again before writing
@@ -185,6 +188,17 @@ Outputs:
 - `results/evaluation/iteration_prospective_metrics.csv`
 - `results/evaluation/stage_performance.png`
 - `results/evaluation/next_formulations_performance.png`
+- `results/evaluation/single_objective_progress.png`
+- `results/evaluation/single_objective_progress_metrics.csv`
+- `results/evaluation/figure7_style_ectoin_ucb.png`
+- `results/evaluation/figure7_style_ectoin_ucb_slice_data.csv`
+
+`figure7_style_ectoin_ucb.png` is a Cryo empirical analog of the paper's
+Figure 7 layout: each row pairs an objective slice and acquisition slice for
+early/mid/late stages using a 1D sweep on `ectoin_M`. It uses the frozen stage
+model with calibrated prediction, a median-profile anchor for non-swept
+features, and a UCB acquisition (`kappa=0.5`). The selected marker on each row
+is the 1D argmax of that row's acquisition curve.
 
 Candidate-hit matching in `06_evaluation_explainability` uses the same
 practical concentration floor, so frozen candidate rows count as hits in
@@ -290,7 +304,7 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 | `04_validation_loop` | Three update strategies + iteration checkpointing + shadow method comparison helpers | Closing the active learning loop with wet lab feedback and comparing candidate update methods without activation |
 | `05_bo_optimization` | Differential Evolution with batched population scoring, wet-lab-aware BO context, shared iteration-aware model loading | Exploiting validated winners while proposing nearby informative variants |
 | `06_evaluation_explainability` | Stage-based evaluation, recommendation-slate auditing, SHAP, PDPs, Interaction Contours, shared iteration-aware model loading | Measuring frozen-stage performance, auditing `07` outputs, and understanding model drivers |
-| `07_next_formulations` | Strict next-batch generation from BO outputs + residual blind spots + smaller-batch subset recommendation | Selecting exactly 20 future wet-lab formulations with an 8 exploit / 12 explore split and recommending subsets for batch sizes 6 through 12 |
+| `07_next_formulations` | Strict next-batch generation from BO outputs + residual blind spots + adaptive exploit/explore split + smaller-batch subset recommendation | Selecting exactly 20 future wet-lab formulations with diagnostics-driven exploit/explore counts and recommending subsets for batch sizes 6 through 12 |
 
 ## Key Features
 
@@ -307,5 +321,7 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 - **Canonical observed context** (`04` writes `observed_context.csv`; `03`, `05`, and `06` all consume the same active iteration view)
 - **Wet-lab-aware BO** (`05` uses weighted observed context and seeds from top observed formulations)
 - **Vectorized DE scoring** (`05` evaluates each DE population in batches so GP prediction and penalty calculations are not repeated point-by-point)
+- **Metadata-driven calibration** (`04` learns `bias_shift_percent` and `uncertainty_scale`; `05/06/07` consume the same calibrated prediction path)
 - **Strict next-batch planning** (`07` validates inputs, generates calibration probes from residual blind spots, and writes traceable next-batch artifacts)
+- **Adaptive exploit/explore policy** (`07` retunes exploit/explore counts from recent residual and coverage diagnostics while keeping total batch size fixed at 20)
 - **Subset recommendation for limited wet-lab capacity** (`07` writes exact best-subset recommendations for batch sizes 6 through 12)

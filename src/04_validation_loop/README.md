@@ -95,7 +95,7 @@ That script is separate from the update loop on purpose:
 
 - `04_validation_loop` measures how the frozen stages performed
 - `07_next_formulations` uses stage residuals plus active BO outputs to choose the next 20 formulations
-- the split is fixed at 8 exploitation + 12 exploration/calibration
+- the exploit/explore split is adaptive (default 8/12 baseline, diagnostics-driven adjustment bounded to exploit 4..12)
 - the exploration bucket is assembled from local-rank probes, blind-spot probes, and BO fallback only when needed
 - the output directory also includes recommended subsets for wet-lab capacities from 6 to 12 formulations
 - the run is strict: it fails before writing if the active stage, validation stage sequence, or required BO artifacts are inconsistent
@@ -179,9 +179,20 @@ Uses literature GP as prior mean, wet lab GP models corrections.
 
 **Configuration:**
 ```python
-ALPHA_LITERATURE = 1.0   # Higher noise = less trusted
-ALPHA_WETLAB = 0.02      # Lower noise = more trusted  (50x trust ratio)
+ALPHA_LITERATURE_GRID = (0.5, 1.0, 2.0)
+ALPHA_WETLAB_GRID = (0.005, 0.01, 0.02, 0.05)
 ```
+
+Each update run selects the alpha pair from this grid by wet-lab CV diagnostics,
+then computes post-hoc calibration metadata:
+
+- `bias_shift_percent`
+- `uncertainty_scale`
+- raw and calibrated coverage diagnostics (for example `cv_coverage_1sigma*`)
+
+The selected values are persisted in `model_metadata.json` (for example
+`alpha_literature_selected`, `alpha_wetlab_selected`, `alpha_grid_search`,
+`alpha_selection_mode`) and consumed downstream by `05`, `06`, and `07`.
 
 **Pros:**
 - Corrects systematic biases

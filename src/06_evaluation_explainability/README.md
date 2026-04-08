@@ -58,12 +58,17 @@ Outputs:
 - `results/evaluation/iteration_prospective_summary.json`
 - `results/evaluation/iteration_prospective_metrics.csv`
 - `results/evaluation/stage_performance.png`
+- `results/evaluation/single_objective_progress.png`
+- `results/evaluation/single_objective_progress_metrics.csv`
+- `results/evaluation/figure7_style_ectoin_ucb.png`
+- `results/evaluation/figure7_style_ectoin_ucb_slice_data.csv`
 
 The evaluator reports:
 
 - batch-level predictive metrics such as RMSE, MAE, Spearman, Kendall, coverage, and hit rates
 - candidate-rank cross references showing which frozen candidate rows were later tested in wet lab
 - recommendation-slate evaluation for `results/next_formulations/<iteration_tag>/next_formulations.csv`, including exploit/explore and origin-level summaries when those files exist
+- calibration-aware prediction scoring using active model metadata (`bias_shift_percent`, `uncertainty_scale`) so `06` matches `05` and `07` uncertainty conventions
 
 `stage_performance.png` is a categorized small-multiples dashboard rather than
 a 3-metric summary chart. It groups stage metrics into:
@@ -89,6 +94,22 @@ the only difference is a trace ingredient that should effectively be zero.
 Additional evaluation outputs:
 
 - `results/evaluation/next_formulations_performance.png`
+
+Figure-7-style Cryo empirical slice output:
+
+- `results/evaluation/figure7_style_ectoin_ucb.png` (3x2 objective/acquisition layout)
+- `results/evaluation/figure7_style_ectoin_ucb_slice_data.csv` (full sweep data)
+
+Fixed choices for this Figure-7-style plot:
+
+- swept feature is `ectoin_M`
+- non-swept features use the stage training-data median profile anchor
+- acquisition curve is UCB with `kappa=0.5`
+- selected marker is the 1D argmax of the plotted UCB curve
+- stage rows are auto-chosen as earliest/median/latest with data
+
+This is an empirical Cryo analog and does not plot a synthetic ground-truth
+function.
 
 The recommendation-slate audit rescales the saved `07` rows with the frozen
 stage model inside `06`, then compares them with subsequent wet-lab measurements.
