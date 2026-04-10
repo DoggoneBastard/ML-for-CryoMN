@@ -2,7 +2,7 @@
 
 Machine learning pipeline for optimizing cryoprotective formulations for cryomicroneedle (CryoMN) technology.
 
-Repository checkpoint artifacts referenced below use stage-tagged iteration directories such as `iteration_5_prior_mean`.
+Repository checkpoint artifacts referenced below use stage-tagged iteration directories such as `iteration_8_prior_mean`.
 
 ## Goals
 
@@ -140,12 +140,12 @@ This script:
 - validates inputs before generation and validates all 20 outputs again before writing
 
 Outputs are written under `results/next_formulations/<iteration_tag>/`, for example:
-- `results/next_formulations/iteration_5_prior_mean/next_formulations.csv`
-- `results/next_formulations/iteration_5_prior_mean/next_formulations_summary.txt`
-- `results/next_formulations/iteration_5_prior_mean/next_formulations_metadata.json`
-- `results/next_formulations/iteration_5_prior_mean/input_validation.json`
-- `results/next_formulations/iteration_5_prior_mean/batch_recommendations.json`
-- `results/next_formulations/iteration_5_prior_mean/batch_recommendations.csv`
+- `results/next_formulations/iteration_8_prior_mean/next_formulations.csv`
+- `results/next_formulations/iteration_8_prior_mean/next_formulations_summary.txt`
+- `results/next_formulations/iteration_8_prior_mean/next_formulations_metadata.json`
+- `results/next_formulations/iteration_8_prior_mean/input_validation.json`
+- `results/next_formulations/iteration_8_prior_mean/batch_recommendations.json`
+- `results/next_formulations/iteration_8_prior_mean/batch_recommendations.csv`
 
 The summary and metadata artifacts record which positive-residual thresholds
 were tried, which threshold was selected, how many exploration rows came
@@ -233,19 +233,19 @@ Interpretation:
 
 Understanding which ingredients drive cell viability predictions is crucial for guiding wet lab experiments. The explainability module renders a support-aware visual suite: contour-style figures preserve the BO aesthetic, observed literature and wet-lab support are shown directly, and stronger-support regions are indicated with boundaries instead of masking the surfaces.
 
-### Explainability Outputs (`iteration_5_prior_mean`)
+### Explainability Outputs (`iteration_8_prior_mean`)
 
-The explainability outputs shown here live in `results/explainability/iteration_5_prior_mean/`. The suite emphasizes top drivers such as `ethylene_glycol`, `dmso`, `ectoin`, `fbs`, and `hsa`, while making the support envelope explicit.
+The explainability outputs shown here live in `results/explainability/iteration_8_prior_mean/`. The suite emphasizes top drivers such as `ethylene_glycol`, `dmso`, `ectoin`, `fbs`, and `hsa`, while making the support envelope explicit.
 
 #### SHAP Summary
 
-![SHAP Summary](results/explainability/iteration_5_prior_mean/shap_summary.png)
+![SHAP Summary](results/explainability/iteration_8_prior_mean/shap_summary.png)
 
 The SHAP summary is intentionally limited to the top features. Point color encodes feature value and horizontal spread shows the direction and magnitude of each feature's contribution across observed formulations.
 
 #### Feature Importance
 
-![Feature Importance](results/explainability/iteration_5_prior_mean/feature_importance.png)
+![Feature Importance](results/explainability/iteration_8_prior_mean/feature_importance.png)
 
 In the feature-importance chart, the dashed vertical line is only a visual dominance cutoff separating the strongest drivers from the long tail; it is not a hard selection threshold.
 
@@ -253,25 +253,25 @@ In the feature-importance chart, the dashed vertical line is only a visual domin
 
 The acquisition landscape defaults to **Upper Confidence Bound (UCB)** and mirrors the `05` BO visual language. The static score view includes support and sparsity penalties, while dashed support boundaries indicate where the pair is better grounded in observed data:
 
-![Acquisition Landscape](results/explainability/iteration_5_prior_mean/acquisition_landscape.png)
+![Acquisition Landscape](results/explainability/iteration_8_prior_mean/acquisition_landscape.png)
 
 #### Interaction Contours
 
 Visualizing how pairs of top ingredients interact to affect viability, with observed-point overlays and dashed support boundaries:
 
-![Interaction Contours](results/explainability/iteration_5_prior_mean/interaction_contours.png)
+![Interaction Contours](results/explainability/iteration_8_prior_mean/interaction_contours.png)
 
 Across the support-aware figures, the dashed white boundary marks the stronger pairwise support envelope inferred from observed formulations. Inside that boundary, the surface is better anchored by observed data; outside it, the same surface is rendered for continuity but should be read as more extrapolative.
 
 #### Uncertainty Analysis
 
-![Uncertainty Analysis](results/explainability/iteration_5_prior_mean/uncertainty_analysis.png)
+![Uncertainty Analysis](results/explainability/iteration_8_prior_mean/uncertainty_analysis.png)
 
 #### Support Diagnostics
 
 This companion diagnostic shows where the top features and top pair are actually supported by literature and wet-lab observations:
 
-![Support Diagnostics](results/explainability/iteration_5_prior_mean/support_diagnostics.png)
+![Support Diagnostics](results/explainability/iteration_8_prior_mean/support_diagnostics.png)
 
 For detailed interpretation and additional visualizations, see [`src/06_evaluation_explainability/README.md`](src/06_evaluation_explainability/README.md).
 

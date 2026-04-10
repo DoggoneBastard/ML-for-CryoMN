@@ -55,7 +55,7 @@ These BO outputs are also the BO source pool consumed by
 `<iteration_tag>` comes from the resolved active model identity, for example:
 - `iteration_1`
 - `iteration_3_weighted_simple`
-- `iteration_5_prior_mean`
+- `iteration_8_prior_mean`
 
 ## How It Works
 

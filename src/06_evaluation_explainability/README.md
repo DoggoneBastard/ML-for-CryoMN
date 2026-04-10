@@ -128,7 +128,7 @@ It reports:
 
 - `iteration_1`
 - `iteration_3_weighted_simple`
-- `iteration_5_prior_mean`
+- `iteration_8_prior_mean`
 
 If no explicit iteration metadata exists, the fallback directory is:
 
