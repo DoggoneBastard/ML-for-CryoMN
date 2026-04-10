@@ -95,7 +95,7 @@ That script is separate from the update loop on purpose:
 
 - `04_validation_loop` measures how the frozen stages performed
 - `07_next_formulations` uses stage residuals plus active BO outputs to choose the next 20 formulations
-- the split is fixed at 8 exploitation + 12 exploration/calibration
+- the exploit/explore split is adaptive (default 8/12 baseline, diagnostics-driven adjustment bounded to exploit 4..12)
 - the exploration bucket is assembled from local-rank probes, blind-spot probes, and BO fallback only when needed
 - the output directory also includes recommended subsets for wet-lab capacities from 6 to 12 formulations
 - the run is strict: it fails before writing if the active stage, validation stage sequence, or required BO artifacts are inconsistent
@@ -179,9 +179,37 @@ Uses literature GP as prior mean, wet lab GP models corrections.
 
 **Configuration:**
 ```python
-ALPHA_LITERATURE = 1.0   # Higher noise = less trusted
-ALPHA_WETLAB = 0.02      # Lower noise = more trusted  (50x trust ratio)
+ALPHA_LITERATURE = 1.0
+ALPHA_WETLAB = 0.02
 ```
+
+`ALPHA_LITERATURE` and `ALPHA_WETLAB` are global source-level GP noise
+hyperparameters, not per-point edits. They are fixed numeric assumptions for
+all runs under this policy:
+
+- literature rows share one fixed alpha (`1.0`)
+- wet-lab rows share one fixed alpha (`0.02`)
+
+After fitting with fixed alphas, the script computes post-hoc calibration
+metadata from wet-lab CV residual diagnostics:
+
+- `bias_shift_percent`
+- `uncertainty_scale`
+- raw and calibrated coverage diagnostics (for example `cv_coverage_1sigma*`)
+
+Produced metadata keys include:
+
+- `alpha_literature`, `alpha_wetlab`, `noise_ratio`
+- `bias_shift_percent`, `uncertainty_scale`
+- `cv_coverage_1sigma`, `cv_coverage_2sigma`
+- `cv_mean_signed_residual`, `cv_mean_abs_residual`
+- `cv_coverage_1sigma_calibrated`, `cv_coverage_2sigma_calibrated`
+
+Why this is not wet-lab data manipulation:
+
+- wet-lab measurements in `validation_results.csv` are never altered
+- model fit still uses the original measured labels
+- calibration adjusts predicted mean/std outputs, not the measured outcomes
 
 **Pros:**
 - Corrects systematic biases

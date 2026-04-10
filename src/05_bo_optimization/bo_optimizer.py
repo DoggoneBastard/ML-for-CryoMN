@@ -42,6 +42,7 @@ from observed_context import (  # noqa: E402
     load_observed_context,
     weighted_quantile,
 )
+from prediction_calibration import apply_prediction_calibration  # noqa: E402
 
 
 # =============================================================================
@@ -95,6 +96,7 @@ def expected_improvement(x: np.ndarray, gp,
     else:
         x_scaled = scaler.transform(x_reshaped)
         mean, std = gp.predict(x_scaled, return_std=True)
+    mean, std = apply_prediction_calibration(mean, std)
     mean, std = mean[0], std[0]
     
     # Handle zero variance
@@ -129,6 +131,7 @@ def upper_confidence_bound(x: np.ndarray, gp,
     else:
         x_scaled = scaler.transform(x_reshaped)
         mean, std = gp.predict(x_scaled, return_std=True)
+    mean, std = apply_prediction_calibration(mean, std)
     mean, std = mean[0], std[0]
     
     return mean + kappa * std
@@ -227,7 +230,8 @@ class BayesianOptimizer:
     
     def __init__(self, gp, scaler: StandardScaler,
                  feature_names: List[str], config: BOConfig = None,
-                 is_composite: bool = False):
+                 is_composite: bool = False,
+                 metadata: Optional[Dict] = None):
         """
         Initialize optimizer.
         
@@ -243,6 +247,7 @@ class BayesianOptimizer:
         self.feature_names = feature_names
         self.config = config or BOConfig()
         self.is_composite = is_composite
+        self.metadata = dict(metadata or {})
         
         # Find DMSO index
         self.dmso_index = -1
@@ -470,10 +475,18 @@ class BayesianOptimizer:
     def _predict_batch(self, X: np.ndarray, return_std: bool = False):
         """Predict a batch of candidate formulations with one scaler/model call."""
         if self.is_composite:
-            return self.gp.predict(X, return_std=return_std)
+            mean, std = self.gp.predict(X, return_std=True)
+            mean, std = apply_prediction_calibration(mean, std, self.metadata)
+            if return_std:
+                return mean, std
+            return mean
 
         X_scaled = self.scaler.transform(X)
-        return self.gp.predict(X_scaled, return_std=return_std)
+        mean, std = self.gp.predict(X_scaled, return_std=True)
+        mean, std = apply_prediction_calibration(mean, std, self.metadata)
+        if return_std:
+            return mean, std
+        return mean
 
     def _acquisition_from_predictions(self, mean: np.ndarray, std: np.ndarray,
                                       y_best: float) -> np.ndarray:
@@ -907,7 +920,14 @@ def main():
         n_candidates=20,
     )
     
-    optimizer = BayesianOptimizer(gp, scaler, feature_names, config, is_composite=is_composite)
+    optimizer = BayesianOptimizer(
+        gp,
+        scaler,
+        feature_names,
+        config,
+        is_composite=is_composite,
+        metadata=metadata,
+    )
     
     # Generate candidates
     print("\n" + "-" * 40)

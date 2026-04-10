@@ -49,8 +49,8 @@ These BO outputs are also the BO source pool consumed by
 `src/07_next_formulations/next_formulations.py`, which builds the final
 20-formulation wet-lab batch by combining:
 
-- 8 exploitation picks from these `05` BO candidate files
-- 12 exploration/calibration probes assembled from local-rank probes, blind-spot probes, and BO fallback if needed
+- an adaptive number of exploitation picks sourced from these `05` BO candidate files (default baseline 8)
+- an adaptive exploration/calibration remainder assembled from local-rank probes, blind-spot probes, and BO fallback if needed
 
 `<iteration_tag>` comes from the resolved active model identity, for example:
 - `iteration_1`
@@ -65,8 +65,9 @@ These BO outputs are also the BO source pool consumed by
 2. Load the exact artifacts for the selected iteration
 3. Build the BO context from the active observed context (literature + wet-lab rows with `context_weight`)
 4. Compute `y_best` from model predictions on the combined observed set
-5. Seed the candidate pool with the best observed formulations under the active model
-6. For each remaining candidate (sequentially):
+5. Apply metadata-driven calibration (`bias_shift_percent`, `uncertainty_scale`) to GP mean/std before acquisition scoring
+6. Seed the candidate pool with the best observed formulations under the active model
+7. For each remaining candidate (sequentially):
    - Run Differential Evolution to find `x* = argmax(UCB(x) - penalty(x))`
    - DE starts from warm starts around top observed formulations instead of a blind search only
    - Each DE generation is scored as a batch, so model inference and penalty evaluation are applied to the full population together
@@ -74,9 +75,9 @@ These BO outputs are also the BO source pool consumed by
    - **Batch diversity**: Gaussian penalty repels DE away from already selected candidates
    - Constraint violations (DMSO, ingredient count, distance from observed support) are penalized
    - Exact duplicates are skipped
-7. Recalculate pure UCB (without penalty) for accurate reporting
-8. Rank candidates by predicted viability for exploit-oriented export
-9. Export with predictions, uncertainty estimates, and acquisition values for downstream policy use
+8. Recalculate pure UCB (without penalty) for accurate reporting
+9. Rank candidates by predicted viability for exploit-oriented export
+10. Export with predictions, uncertainty estimates, and acquisition values for downstream policy use
 
 ### Batch Diversity (Local Penalization)
 
@@ -91,6 +92,10 @@ Where `strength` and `r` (radius) control how strongly candidates repel each oth
 ### Upper Confidence Bound (UCB)
 
 This optimizer uses the **Upper Confidence Bound (UCB)** acquisition function rather than Expected Improvement (EI). The BO part is the search itself: DE repeatedly optimizes UCB over the constrained formulation space to discover the candidate set before the final export ordering is applied.
+
+When calibration metadata exists on the active model, `05` applies it to the
+predicted mean/std used by UCB (and EI when enabled), so BO search uses the
+same calibrated uncertainty convention as `06` and `07`.
 
 ```
 UCB(x) = μ(x) + κ · σ(x)
@@ -149,4 +154,4 @@ This matters for narrow peaks such as the validated ectoin + ethylene glycol reg
 
 - **`03_optimization`**: Quick candidate generation, initial exploration, when speed matters
 - **`05_bo_optimization`**: Serious optimization, when you want a BO-generated candidate pool that preserves the best validated recipes and explores high-value local variants around them
-- **`07_next_formulations`**: After `05`, when you need the actual wet-lab batch recommendation with a strict 8 exploit / 12 explore split, smaller-batch subset recommendations, and full input/output validation
+- **`07_next_formulations`**: After `05`, when you need the actual wet-lab batch recommendation with diagnostics-driven exploit/explore counts, smaller-batch subset recommendations, and full input/output validation
