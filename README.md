@@ -131,8 +131,10 @@ This script:
 - uses `05` BO outputs as the exploitation source pool
 - normalizes existing and newly generated candidates so trace ingredients below `0.1%` or `1.0 mM` are treated as absent
 - chooses exploit/explore counts adaptively from the previous completed stage diagnostics (default `8/12`, bounded to exploit `4..12`, total always `20`)
+- reserves 2 BO-only `coverage_probe` slots selected by greedy k-center distance from observed context
 - adaptively relaxes the positive-residual anchor threshold when stronger anchors are unavailable
 - fills the exploration remainder with local-rank and blind-spot probes using an adaptive local/blindspot target, then uses BO fallback only if needed
+- fails by default if fewer than 2 coverage probes are feasible; `--allow-coverage-shortfall` allows fallback backfill with audit logging
 - allows exploration probes to anchor from any historical positive-residual wet-lab stage
 - writes recommended batch subsets for wet-lab capacities from 6 to 12 formulations
 - validates inputs before generation and validates all 20 outputs again before writing
@@ -147,7 +149,7 @@ Outputs are written under `results/next_formulations/<iteration_tag>/`, for exam
 
 The summary and metadata artifacts record which positive-residual thresholds
 were tried, which threshold was selected, how many exploration rows came
-from local-rank probes, blind-spot probes, and BO fallback, and which
+from local-rank probes, coverage probes, blind-spot probes, and BO fallback, and which
 historical anchor stages fed the generated probes. The text summary also
 includes a human-readable version of each recommended batch subset for wet-lab
 capacities from 6 through 12 formulations.

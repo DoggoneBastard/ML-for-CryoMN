@@ -24,6 +24,7 @@ Optional flags:
 ```bash
 python src/07_next_formulations/next_formulations.py --stage 4
 python src/07_next_formulations/next_formulations.py --overwrite
+python src/07_next_formulations/next_formulations.py --allow-coverage-shortfall
 ```
 
 ## Inputs
@@ -57,12 +58,17 @@ The stage sequence must be contiguous. If the active stage is iteration `N`,
 - try positive-residual anchor thresholds in descending order: `10.0`, `8.0`, `5.0`, `2.0`, `0.0`
 - convert positive residuals into feature-level and pair-level blind-spot signals
 - generate local-rank probes from the top exploitation anchors by scaling the top two active ingredients down and up
+- select exactly 2 BO-only `coverage_probe` rows via greedy k-center farthest-first distance from observed context
 - generate blind-spot probes by midpoint interpolation or local perturbation around underpredicted anchors from historical positive-residual stages
 - clip to BO bounds, zero sub-threshold trace ingredients, and enforce the BO-derived ingredient-count limit
 - re-score with the active model
 - keep local-rank and blind-spot probes ahead of BO fallback, even if a relaxed family cap is needed to fill the exploration bucket
-- set local-rank/blind-spot target counts adaptively from the chosen exploit/explore split
+- set local-rank/blind-spot target counts adaptively from the chosen exploit/explore split after reserving the fixed 2-slot coverage quota
 - backfill from BO only if fewer than the target exploration rows survive after the generated-only top-up pass
+
+Coverage shortfall policy:
+- default behavior is strict: if fewer than 2 valid coverage probes can be selected, the run fails with `ValidationError`
+- optional override `--allow-coverage-shortfall` permits shortfall and lets BO fallback rows backfill missing exploration slots
 
 This is why `07` does not use `03_optimization` as a primary source. The
 exploration half is designed directly from model failures, not from a random
@@ -146,7 +152,10 @@ was scored. Adaptive split fields are included, for example:
 - `adaptive_split_diagnostics`
 - `adaptive_split_triggered_rules`
 - `exploit_count`, `explore_count`
-- `local_rank_probe_target_count`, `blindspot_probe_target_count`
+- `local_rank_probe_target_count`, `blindspot_probe_target_count`, `coverage_probe_target_count`
+- `coverage_probe_count`, `coverage_probe_shortfall`, `coverage_shortfall_allowed`
+- `coverage_pool_rows`, `coverage_reference_rows`, `coverage_selected_signatures`
+- `coverage_selected_min_distance_to_known`, `coverage_min_distance_stats`
 - `generated_explore_count`, `fallback_explore_count`
 
 ## Failure Mode
