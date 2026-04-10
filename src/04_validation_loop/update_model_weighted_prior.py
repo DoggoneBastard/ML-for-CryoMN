@@ -26,7 +26,7 @@ import os
 import json
 import pickle
 import sys
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime
 
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -65,8 +65,6 @@ ALPHA_WETLAB = 0.02        # Lower noise: wet lab data is more trusted
 
 # Noise ratio in the combined approach
 NOISE_RATIO = ALPHA_LITERATURE / ALPHA_WETLAB  # 50x
-ALPHA_LITERATURE_GRID = (0.5, 1.0, 2.0)
-ALPHA_WETLAB_GRID = (0.005, 0.01, 0.02, 0.05)
 CALIBRATION_TARGET_1SIGMA = 0.68
 CALIBRATION_TARGET_2SIGMA = 0.95
 
@@ -333,84 +331,6 @@ def choose_uncertainty_scale(
     return best_scale
 
 
-def select_noise_levels(
-    X_orig: np.ndarray,
-    y_orig: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    alpha_literature_candidates: Tuple[float, ...] = ALPHA_LITERATURE_GRID,
-    alpha_wetlab_candidates: Tuple[float, ...] = ALPHA_WETLAB_GRID,
-) -> Dict[str, object]:
-    """Select alpha_literature and alpha_wetlab from fixed grids."""
-    if len(X_val) < 2:
-        return {
-            'selected_alpha_literature': ALPHA_LITERATURE,
-            'selected_alpha_wetlab': ALPHA_WETLAB,
-            'search_results': [],
-            'selected_metrics': {
-                'rmse': float('nan'),
-                'coverage_1sigma': float('nan'),
-                'coverage_2sigma': float('nan'),
-                'mean_signed_residual': float('nan'),
-            },
-            'selection_mode': 'default_insufficient_wetlab_rows',
-        }
-
-    search_rows = []
-    best_tuple = None
-    best_row: Optional[Dict[str, float]] = None
-    best_diag = None
-
-    for alpha_literature in alpha_literature_candidates:
-        gp_literature, scaler_lit = fit_literature_model(
-            X_orig,
-            y_orig,
-            float(alpha_literature),
-        )
-        for alpha_wetlab in alpha_wetlab_candidates:
-            diag = compute_wetlab_cv_diagnostics(
-                gp_literature,
-                scaler_lit,
-                X_val,
-                y_val,
-                float(alpha_wetlab),
-            )
-            row = {
-                'alpha_literature': float(alpha_literature),
-                'alpha_wetlab': float(alpha_wetlab),
-                'rmse': float(diag['rmse']),
-                'coverage_1sigma': float(diag['coverage_1sigma']),
-                'coverage_2sigma': float(diag['coverage_2sigma']),
-                'mean_signed_residual': float(diag['mean_signed_residual']),
-            }
-            search_rows.append(row)
-            score_tuple = (
-                row['rmse'],
-                abs(row['coverage_1sigma'] - CALIBRATION_TARGET_1SIGMA),
-                abs(row['mean_signed_residual']),
-            )
-            if best_tuple is None or score_tuple < best_tuple:
-                best_tuple = score_tuple
-                best_row = row
-                best_diag = diag
-
-    assert best_row is not None
-    assert best_diag is not None
-    return {
-        'selected_alpha_literature': float(best_row['alpha_literature']),
-        'selected_alpha_wetlab': float(best_row['alpha_wetlab']),
-        'search_results': search_rows,
-        'selected_metrics': {
-            'rmse': float(best_row['rmse']),
-            'coverage_1sigma': float(best_row['coverage_1sigma']),
-            'coverage_2sigma': float(best_row['coverage_2sigma']),
-            'mean_signed_residual': float(best_row['mean_signed_residual']),
-        },
-        'selected_cv': best_diag,
-        'selection_mode': 'grid_search',
-    }
-
-
 def train_prior_mean_model(
     X_orig: np.ndarray,
     y_orig: np.ndarray,
@@ -554,8 +474,6 @@ def update_model_with_prior_mean(
     output_dir: str,
     iteration: int,
     iteration_dir_name: str,
-    alpha_literature: float = ALPHA_LITERATURE,
-    alpha_wetlab: float = ALPHA_WETLAB,
     model_method: str = PRIOR_MEAN_METHOD,
 ) -> Dict:
     """
@@ -566,8 +484,6 @@ def update_model_with_prior_mean(
         validation_data: Tuple of (X_val, y_val) from wet lab
         original_data: Tuple of (X_orig, y_orig) from literature
         output_dir: Directory to save updated model
-        alpha_literature: Noise level for literature data
-        alpha_wetlab: Noise level for wet lab data
         
     Returns:
         Dictionary with update statistics
@@ -577,25 +493,16 @@ def update_model_with_prior_mean(
     
     print(f"Literature data: {len(X_orig)} samples")
     print(f"Wet lab data: {len(X_val)} samples")
-    tuning = select_noise_levels(X_orig, y_orig, X_val, y_val)
-    selected_alpha_literature = float(tuning['selected_alpha_literature'])
-    selected_alpha_wetlab = float(tuning['selected_alpha_wetlab'])
+    fixed_alpha_literature = float(ALPHA_LITERATURE)
+    fixed_alpha_wetlab = float(ALPHA_WETLAB)
     print(
-        f"Selected α values: literature={selected_alpha_literature} | "
-        f"wet lab={selected_alpha_wetlab}"
+        f"Fixed α values: literature={fixed_alpha_literature} | "
+        f"wet lab={fixed_alpha_wetlab}"
     )
     print(
         "Noise ratio (literature/wetlab): "
-        f"{selected_alpha_literature/selected_alpha_wetlab:.1f}x"
+        f"{fixed_alpha_literature/fixed_alpha_wetlab:.1f}x"
     )
-    if tuning.get('selection_mode') == 'grid_search':
-        selected_metrics = tuning['selected_metrics']
-        print(
-            "Selection diagnostics (CV): "
-            f"RMSE={selected_metrics['rmse']:.2f}, "
-            f"coverage@1σ={selected_metrics['coverage_1sigma']:.3f}, "
-            f"mean residual={selected_metrics['mean_signed_residual']:+.2f}"
-        )
     
     # =========================================================================
     # Stage 1: Literature model (already trained, or retrain for consistency)
@@ -608,8 +515,8 @@ def update_model_with_prior_mean(
         y_orig,
         X_val,
         y_val,
-        alpha_literature=selected_alpha_literature,
-        alpha_wetlab=selected_alpha_wetlab,
+        alpha_literature=fixed_alpha_literature,
+        alpha_wetlab=fixed_alpha_wetlab,
     )
     composite_model = training['model']
     gp_literature = training['gp_literature']
@@ -669,11 +576,9 @@ def update_model_with_prior_mean(
     metadata['wetlab_train_rmse'] = train_rmse
     metadata['literature_only_rmse'] = lit_rmse
     metadata['weighting_method'] = 'prior_mean_correction'
-    metadata['alpha_literature'] = selected_alpha_literature
-    metadata['alpha_wetlab'] = selected_alpha_wetlab
-    metadata['noise_ratio'] = selected_alpha_literature / selected_alpha_wetlab
-    metadata['alpha_literature_selected'] = selected_alpha_literature
-    metadata['alpha_wetlab_selected'] = selected_alpha_wetlab
+    metadata['alpha_literature'] = fixed_alpha_literature
+    metadata['alpha_wetlab'] = fixed_alpha_wetlab
+    metadata['noise_ratio'] = fixed_alpha_literature / fixed_alpha_wetlab
     metadata['bias_shift_percent'] = training['bias_shift_percent']
     metadata['uncertainty_scale'] = training['uncertainty_scale']
     metadata['cv_coverage_1sigma'] = training['cv_coverage_1sigma']
@@ -682,8 +587,6 @@ def update_model_with_prior_mean(
     metadata['cv_mean_abs_residual'] = training['cv_mean_abs_residual']
     metadata['cv_coverage_1sigma_calibrated'] = training['cv_coverage_1sigma_calibrated']
     metadata['cv_coverage_2sigma_calibrated'] = training['cv_coverage_2sigma_calibrated']
-    metadata['alpha_grid_search'] = list(tuning.get('search_results', []))
-    metadata['alpha_selection_mode'] = str(tuning.get('selection_mode'))
     metadata = stamp_model_metadata(
         metadata,
         iteration=iteration,
@@ -703,8 +606,6 @@ def update_model_with_prior_mean(
         'improvement': training['improvement'],
         'noise_ratio': training['noise_ratio'],
         'mean_residual': training['mean_residual'],
-        'selected_alpha_literature': selected_alpha_literature,
-        'selected_alpha_wetlab': selected_alpha_wetlab,
         'bias_shift_percent': training['bias_shift_percent'],
         'uncertainty_scale': training['uncertainty_scale'],
         'cv_coverage_1sigma': training['cv_coverage_1sigma'],
@@ -811,8 +712,6 @@ def main():
         updated_model_dir,
         iteration=iteration,
         iteration_dir_name=iteration_dir_name,
-        alpha_literature=ALPHA_LITERATURE,
-        alpha_wetlab=ALPHA_WETLAB,
         model_method=model_method,
     )
 

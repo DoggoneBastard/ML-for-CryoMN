@@ -179,20 +179,37 @@ Uses literature GP as prior mean, wet lab GP models corrections.
 
 **Configuration:**
 ```python
-ALPHA_LITERATURE_GRID = (0.5, 1.0, 2.0)
-ALPHA_WETLAB_GRID = (0.005, 0.01, 0.02, 0.05)
+ALPHA_LITERATURE = 1.0
+ALPHA_WETLAB = 0.02
 ```
 
-Each update run selects the alpha pair from this grid by wet-lab CV diagnostics,
-then computes post-hoc calibration metadata:
+`ALPHA_LITERATURE` and `ALPHA_WETLAB` are global source-level GP noise
+hyperparameters, not per-point edits. They are fixed numeric assumptions for
+all runs under this policy:
+
+- literature rows share one fixed alpha (`1.0`)
+- wet-lab rows share one fixed alpha (`0.02`)
+
+After fitting with fixed alphas, the script computes post-hoc calibration
+metadata from wet-lab CV residual diagnostics:
 
 - `bias_shift_percent`
 - `uncertainty_scale`
 - raw and calibrated coverage diagnostics (for example `cv_coverage_1sigma*`)
 
-The selected values are persisted in `model_metadata.json` (for example
-`alpha_literature_selected`, `alpha_wetlab_selected`, `alpha_grid_search`,
-`alpha_selection_mode`) and consumed downstream by `05`, `06`, and `07`.
+Produced metadata keys include:
+
+- `alpha_literature`, `alpha_wetlab`, `noise_ratio`
+- `bias_shift_percent`, `uncertainty_scale`
+- `cv_coverage_1sigma`, `cv_coverage_2sigma`
+- `cv_mean_signed_residual`, `cv_mean_abs_residual`
+- `cv_coverage_1sigma_calibrated`, `cv_coverage_2sigma_calibrated`
+
+Why this is not wet-lab data manipulation:
+
+- wet-lab measurements in `validation_results.csv` are never altered
+- model fit still uses the original measured labels
+- calibration adjusts predicted mean/std outputs, not the measured outcomes
 
 **Pros:**
 - Corrects systematic biases

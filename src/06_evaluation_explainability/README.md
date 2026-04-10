@@ -23,7 +23,7 @@ python src/06_evaluation_explainability/evaluate_iterations.py
 # Model explainability
 python src/06_evaluation_explainability/explainability.py
 
-# Model explainability (legacy colors)
+# Model explainability (alternate palette profile)
 python src/06_evaluation_explainability/explainability.py --palette-profile legacy
 ```
 
@@ -39,9 +39,8 @@ missing or inconsistent, `explainability.py` can prompt for an iteration number
 and repair `models/model_metadata.json` with an explicit overwrite notice.
 
 When the canonical observed-context artifact is missing, `explainability.py`
-reconstructs it from literature plus wet-lab inputs. For older prior-mean
-iterations it can also read the legacy `data/processed/evaluation_data.csv`
-mirror.
+reconstructs it from literature plus wet-lab inputs. It can also read the
+`data/processed/evaluation_data.csv` mirror when needed.
 
 ## Stage Evaluation
 
@@ -142,7 +141,7 @@ The explainability suite is intentionally support-aware:
 - stronger-support regions are marked with dashed boundaries or line-style changes instead of masking the surface
 - the BO landscape keeps the contour aesthetic, but documents which production penalties are included
 - default colormaps use a warm, color-blind-friendly profile (`magma` / `cividis` / `viridis`);
-  use `--palette-profile legacy` to reproduce the historical palette (`RdYlGn` / `YlOrRd` / `viridis`)
+  use `--palette-profile legacy` to apply the alternate palette profile (`RdYlGn` / `YlOrRd` / `viridis`)
 
 Support cues:
 

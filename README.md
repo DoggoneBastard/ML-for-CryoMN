@@ -88,7 +88,7 @@ by completed wet-lab stages.
 - Composite iterations are strict: if metadata says composite, the shared resolver will not fall back to a standard GP automatically.
 - `03_optimization`, `05_bo_optimization`, and `06_evaluation_explainability` all load the same iteration-aware observed context, and reconstruct it from literature + validation inputs on demand if the artifact is missing.
 - `05_bo_optimization` uses analytic wet-lab weights from the observed context when calibrating BO support geometry, instead of relying on literal duplicate rows.
-- `04_validation_loop/update_model_weighted_prior.py` auto-selects literature/wet-lab noise levels from fixed alpha grids and writes calibration metadata (`bias_shift_percent`, `uncertainty_scale`, coverage diagnostics) into the active model metadata.
+- `04_validation_loop/update_model_weighted_prior.py` uses fixed source-level noise hyperparameters (`alpha_literature=1.0`, `alpha_wetlab=0.02`) and writes post-hoc calibration metadata (`bias_shift_percent`, `uncertainty_scale`, coverage diagnostics) into active model metadata.
 - `05`, `06`, and `07` apply the same metadata-driven prediction calibration path so acquisition, evaluation, and next-batch selection are consistent.
 - `03`, `05`, `06`, and `07` share a practical concentration floor for formulation identity: values below `0.1%` or below `1.0 mM` are treated as absent when generating candidates, matching hits, and rendering formulation strings.
 - The repository does not rely on one permanent static train/test split. The update scripts estimate wet-lab generalization with K-fold cross-validation over wet-lab rows only, while retaining all literature rows in training for every fold.
@@ -282,7 +282,7 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 ```
 ├── data/
 │   ├── raw/                    # Original literature data
-│   ├── processed/              # Parsed formulations + legacy prior-mean evaluation mirror
+│   ├── processed/              # Parsed formulations + prior-mean evaluation mirror
 │   └── validation/             # Wet lab results template
 ├── models/                     # Active model mirror + per-iteration checkpoints + observed context
 ├── results/                    # Optimized candidates + explainability + evaluation graphs
@@ -323,7 +323,7 @@ For detailed interpretation and additional visualizations, see [`src/06_evaluati
 - **Canonical observed context** (`04` writes `observed_context.csv`; `03`, `05`, and `06` all consume the same active iteration view)
 - **Wet-lab-aware BO** (`05` uses weighted observed context and seeds from top observed formulations)
 - **Vectorized DE scoring** (`05` evaluates each DE population in batches so GP prediction and penalty calculations are not repeated point-by-point)
-- **Metadata-driven calibration** (`04` learns `bias_shift_percent` and `uncertainty_scale`; `05/06/07` consume the same calibrated prediction path)
+- **Metadata-driven calibration** (`04` fits with fixed alpha assumptions, then learns `bias_shift_percent` and `uncertainty_scale`; `05/06/07` consume the same calibrated prediction path)
 - **Strict next-batch planning** (`07` validates inputs, generates calibration probes from residual blind spots, and writes traceable next-batch artifacts)
 - **Adaptive exploit/explore policy** (`07` retunes exploit/explore counts from recent residual and coverage diagnostics while keeping total batch size fixed at 20)
 - **Subset recommendation for limited wet-lab capacity** (`07` writes exact best-subset recommendations for batch sizes 6 through 12)
