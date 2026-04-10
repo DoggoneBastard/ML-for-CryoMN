@@ -63,19 +63,20 @@ python src/07_next_formulations/next_formulations.py
 
 ## Repository Snapshot
 
-The snapshot dated 2026-03-16 uses the composite prior-mean correction checkpoint `iteration_4_prior_mean`.
+The snapshot dated 2026-04-10 uses the composite prior-mean correction checkpoint `iteration_8_prior_mean`.
 
 | Metric | Snapshot value |
 |--------|---------------|
-| Wet-lab validation rows | 43 |
-| Wet-lab batch date in snapshot | 2026-03-12 |
-| Best validated viability | 79.09% |
-| Best validated formulation | 304.7mM ectoin + 1.55M ethylene glycol |
-| Mean wet-lab viability | 37.75% |
-| Median wet-lab viability | 35.08% |
-| Wet-lab runs at or above 50% viability | 14 |
+| Wet-lab validation rows | 90 |
+| Latest wet-lab batch date in snapshot | 2026-04-09 |
+| Best validated viability | 95.15% |
+| Best validated formulation | 21.0mM DMSO + 291.1mM ectoin + 1.79M ethylene glycol + 5.4% FBS |
+| Mean wet-lab viability | 50.13% |
+| Median wet-lab viability | 52.13% |
+| Wet-lab runs at or above 50% viability | 49 |
 
-The snapshot highlights the ectoin + ethylene glycol ridge, while the
+The snapshot highlights the ectoin + ethylene glycol ridge with FBS-augmented
+variants, while the
 residual-driven `07_next_formulations` step adapts to the blind spots exposed
 by completed wet-lab stages.
 
@@ -101,21 +102,21 @@ by completed wet-lab stages.
 
 The best measured wet-lab result in this snapshot is:
 
-- `79.09%` viability for `304.7mM ectoin + 1.55M ethylene glycol`
+- `95.15%` viability for `21.0mM DMSO + 291.1mM ectoin + 1.79M ethylene glycol + 5.4% FBS`
 
 That same region remains the model's top BO target, which is a useful consistency check between prediction and validation.
 
 ### DE-Based Bayesian Optimization (`05_bo_optimization`)
 
-General BO summary for this snapshot: `results/bo_candidates_general_iteration_4_prior_mean_summary.txt`
+General BO summary for this snapshot: `results/bo_candidates_general_iteration_8_prior_mean_summary.txt`
 
 | Rank | Formulation | Predicted viability |
 |------|-------------|---------------------|
-| 1 | 304.7mM ectoin + 1.55M ethylene glycol | 77.9% ± 14.2% |
-| 2 | 310.5mM ectoin + 1.57M ethylene glycol + 0.1% HSA + 142.8mM raffinose | 75.9% ± 15.3% |
-| 3 | 314.1mM ectoin + 1.43M ethylene glycol | 75.6% ± 15.6% |
-| 4 | 304.7mM ectoin + 1.55M ethylene glycol + 6.5% FBS | 72.6% ± 16.9% |
-| 5 | 48.6mM betaine + 32.5mM DMSO + 305.6mM ectoin + 1.65M ethylene glycol + 0.2% HSA + 24.6mM sucrose | 72.6% ± 17.0% |
+| 1 | 11.0mM DMSO + 289.7mM ectoin + 1.81M ethylene glycol + 5.7% FBS | 76.3% ± 13.3% |
+| 2 | 284.8mM ectoin + 1.81M ethylene glycol + 4.9% FBS | 75.7% ± 13.4% |
+| 3 | 21.0mM DMSO + 291.1mM ectoin + 1.79M ethylene glycol + 5.4% FBS | 75.7% ± 13.3% |
+| 4 | 331.4mM ectoin + 1.89M ethylene glycol + 6.7% FBS + 0.3% methylcellulose | 75.6% ± 14.8% |
+| 5 | 362.0mM ectoin + 1.94M ethylene glycol + 6.6% FBS | 75.5% ± 15.0% |
 
 ### Next Formulations (`07_next_formulations`)
 
@@ -176,7 +177,10 @@ model output against the wet-lab batch it actually generated:
 - `iteration_2_*` outputs → `EXP2101` to `EXP2106`
 - `iteration_3_*` outputs → `EXP3101` to `EXP3108`
 - `iteration_4_*` outputs → `EXP4101` to `EXP4106`
-- `iteration_5_*` outputs → pending wet-lab results
+- `iteration_5_*` outputs → wet-lab batches on 2026-03-24 and 2026-03-26
+- `iteration_6_*` outputs → wet-lab batch on 2026-03-31
+- `iteration_7_*` outputs → wet-lab batch on 2026-04-09
+- `iteration_8_*` outputs → pending wet-lab results
 
 Run:
 
@@ -216,13 +220,16 @@ Stage-level metrics from the saved evaluation artifacts:
 | Iteration 2 | `EXP2101-EXP2106` | 6 | 14.74 | 0.086 | 0.667 |
 | Iteration 3 | `EXP3101-EXP3108` | 8 | 21.05 | 0.476 | 0.625 |
 | Iteration 4 | `EXP4101-EXP4106` | 6 | 9.24 | -0.600 | 1.000 |
-| Iteration 5 | pending wet-lab results | 0 | N/A | N/A | N/A |
+| Iteration 5 | `2026-03-24, 2026-03-26` | 23 | 20.87 | 0.793 | 0.826 |
+| Iteration 6 | `2026-03-31` | 6 | 20.68 | 0.657 | 0.833 |
+| Iteration 7 | `2026-04-09` | 12 | 18.50 | 0.818 | 0.750 |
+| Iteration 8 | pending wet-lab results | 0 | N/A | N/A | N/A |
 
 Interpretation:
 
-- absolute error improved substantially from literature-only to iteration 2
-- rank ordering remains weak, especially for literature-only and iteration 1
-- iteration 3 ranks better than iteration 2, but remains a weak calibrated predictor
+- absolute error improved sharply from the literature-only baseline, with best RMSE at iteration 4
+- rank ordering strengthened materially in later stages, peaking so far in iterations 5 and 7
+- hit rate at 50% remains high for recent completed stages (iterations 5 to 7)
 - `07_next_formulations` uses stage residuals plus BO outputs to choose a mixed exploit/explore wet-lab batch
 
 ![Stage Performance](results/evaluation/stage_performance.png)
