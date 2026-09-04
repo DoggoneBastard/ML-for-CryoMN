@@ -1,0 +1,80 @@
+{
+  "baseline_commit": "7e86815",
+  "formulations_sha256": "6fc130706d482c4ced6bf610b4048f78158de577735181b4e4e7104999a16059",
+  "observations_sha256": "98148650e4d9d3a4c5ed5458982230158ba5a353b30ab89eef842913e6c4518e",
+  "formulations_shape": [392, 29],
+  "observations_shape": [796, 11],
+  "endpoint_counts": {
+    "viability_percent": 628,
+    "intact_patch_formation_pass": 168,
+    "critical_axial_load_N_per_needle": 0
+  },
+  "source_type_counts": {
+    "wetlab_feedback": 492,
+    "legacy_literature": 198,
+    "legacy_wetlab": 106
+  },
+  "active_round": "ROUND_009",
+  "active_phase": "mechanics_bootstrap",
+  "proposal_column_count": 132,
+  "proposal_candidate_ids": [
+    "retest_v2_6f20e63adb1d",
+    "retest_v2_7371aa062562",
+    "cand_001149",
+    "rescue_000027",
+    "cand_001152",
+    "cand_000548",
+    "cand_000290",
+    "cand_001885",
+    "cand_001965",
+    "cand_001923",
+    "cand_001589",
+    "cand_001515"
+  ],
+  "mechanical_test_recommended": [
+    false,
+    false,
+    false,
+    false,
+    true,
+    false,
+    false,
+    true,
+    true,
+    false,
+    false,
+    true
+  ],
+  "viability_prediction_status": [
+    "observed_retest",
+    "observed_retest",
+    "unknown_prior_reversion",
+    "model_supported",
+    "model_supported",
+    "model_supported",
+    "model_supported",
+    "unknown_prior_reversion",
+    "unknown_prior_reversion",
+    "unknown_prior_reversion",
+    "unknown_prior_reversion",
+    "unknown_prior_reversion"
+  ],
+  "formal_prospective_metrics": {
+    "viability_percent": {
+      "n_evaluated": 72,
+      "mae": 27.45603818528404,
+      "rmse": 31.627344441126034,
+      "bias": 25.22353261643731,
+      "r2": -2.3026357213110695,
+      "interval_95_coverage": 0.6666666666666666
+    },
+    "intact_patch_formation_pass": {
+      "n_evaluated": 72,
+      "brier_score": 0.16867030790952386,
+      "accuracy": 0.7777777777777778
+    },
+    "critical_axial_load_N_per_needle": {
+      "n_evaluated": 0
+    }
+  }
+}
