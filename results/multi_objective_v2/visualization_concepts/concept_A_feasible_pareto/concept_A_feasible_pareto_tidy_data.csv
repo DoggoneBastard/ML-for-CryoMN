@@ -1,0 +1,16 @@
+point_id,point_type,viability_percent,critical_axial_load_N_per_needle,viability_std,load_std,intact_status
+demo_obs_01,feasible_observed,24.0,2.55,,,pass
+demo_obs_02,feasible_observed,34.0,2.35,,,pass
+demo_obs_03,feasible_observed,43.0,2.12,,,pass
+demo_obs_04,failed_intact,51.0,1.95,,,fail
+demo_obs_05,feasible_observed,59.0,1.72,,,pass
+demo_obs_06,feasible_observed,66.0,1.5,,,pass
+demo_obs_07,feasible_observed,72.0,1.34,,,pass
+demo_obs_08,feasible_observed,79.0,1.1,,,pass
+demo_obs_09,feasible_observed,83.0,0.92,,,pass
+demo_obs_10,failed_intact,48.0,1.35,,,fail
+demo_obs_11,feasible_observed,69.0,0.85,,,pass
+demo_rec_01,recommended_prediction,55.15235853987721,2.201224120283654,5.0,0.16,predicted
+demo_rec_02,recommended_prediction,63.48000794687975,1.887445512328442,6.0,0.18,predicted
+demo_rec_03,recommended_prediction,74.37522559790322,1.5331960100791822,7.0,0.2,predicted
+demo_rec_04,recommended_prediction,82.4702823581956,1.1720939351914104,8.0,0.22,predicted

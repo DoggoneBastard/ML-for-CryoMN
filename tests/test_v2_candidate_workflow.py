@@ -19,6 +19,7 @@ from helper.candidate_workflow import (  # noqa: E402
     run_candidate_selection,
 )
 from helper.paths import FORMULATIONS_PATH, OBSERVATIONS_PATH  # noqa: E402
+from helper.registry import load_registry  # noqa: E402
 
 
 class V2CandidateWorkflowTests(unittest.TestCase):
@@ -91,6 +92,58 @@ class V2CandidateWorkflowTests(unittest.TestCase):
                 "frozen_proposal",
             ):
                 self.assertTrue(outcome.artifact_paths[name].exists(), name)
+
+    def test_supplied_pool_outside_registry_bounds_is_rejected(self) -> None:
+        registry = load_registry()
+        with tempfile.TemporaryDirectory() as temporary_name:
+            root = Path(temporary_name)
+            row = {feature: 0.0 for feature in registry.feature_names}
+            row.update(
+                {
+                    "candidate_id": "outside_bounds",
+                    "formulation_id": "outside_bounds",
+                    registry.feature_names[0]: 1e6,
+                }
+            )
+            pool = root / "pool.csv"
+            pd.DataFrame([row]).to_csv(pool, index=False)
+            with self.assertRaisesRegex(SystemExit, "empty after applying registry bounds"):
+                run_candidate_selection(
+                    CandidateSelectionOptions(
+                        formulations_path=FORMULATIONS_PATH,
+                        observations_path=OBSERVATIONS_PATH,
+                        candidate_pool_path=pool,
+                        output_dir=root / "next_round",
+                        total_candidate_pool_path=root / "total.csv",
+                        batch_id="ROUND_009",
+                    )
+                )
+
+    def test_supplied_pool_using_only_unavailable_ingredient_is_rejected(self) -> None:
+        registry = load_registry()
+        with tempfile.TemporaryDirectory() as temporary_name:
+            root = Path(temporary_name)
+            row = {feature: 0.0 for feature in registry.feature_names}
+            row.update(
+                {
+                    "candidate_id": "unavailable_only",
+                    "formulation_id": "unavailable_only",
+                    "human_serum_pct": 1.0,
+                }
+            )
+            pool = root / "pool.csv"
+            pd.DataFrame([row]).to_csv(pool, index=False)
+            with self.assertRaisesRegex(SystemExit, "temporary availability restrictions"):
+                run_candidate_selection(
+                    CandidateSelectionOptions(
+                        formulations_path=FORMULATIONS_PATH,
+                        observations_path=OBSERVATIONS_PATH,
+                        candidate_pool_path=pool,
+                        output_dir=root / "next_round",
+                        total_candidate_pool_path=root / "total.csv",
+                        batch_id="ROUND_009",
+                    )
+                )
 
 
 if __name__ == "__main__":

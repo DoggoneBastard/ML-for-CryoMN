@@ -1,0 +1,13 @@
+selection_rank,candidate_id,formulation_id,formulation_description,selection_role,recommendation_type,viability_prediction_status,public_viability_mean,public_viability_std,empirical_combination_pass_probability,support_status,candidate_origin,mechanical_test_recommended,mechanical_selection_rank,mechanical_transition_role
+1,retest_v2_6f20e63adb1d,v2_6f20e63adb1d,ectoin + ethylene glycol + FBS,round_candidate,retest_priority,observed_retest,37.968311028636194,0.698497228186286,0.8337995735113701,in_support,retest,False,,
+2,retest_v2_7371aa062562,v2_7371aa062562,glycerol + glucose + creatine,round_candidate,retest_priority,observed_retest,50.09737772279327,0.9992374487030832,0.6666666666666666,in_support,retest,False,,
+3,cand_001149,v2_e520c20c7441,proline + creatine,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,sparse_exploration,False,6.0,bootstrap_coverage
+4,rescue_000027,v2_a5836ff741f8,ectoin + ethylene glycol + FBS,round_candidate,rescue_candidate,model_supported,63.11232909226954,2.9171553972520927,0.6276818242567705,in_support,rescue_dilution,False,10.0,bootstrap_coverage
+5,cand_001152,v2_958a475d561d,ectoin + ethylene glycol,round_candidate,screening_candidate,model_supported,60.63482823754864,11.217318148971897,0.7557393408716847,in_support,sparse_exploration,True,1.0,bootstrap_utility
+6,cand_000548,v2_e4e4fdaec9b1,ectoin + ethylene glycol,round_candidate,screening_candidate,model_supported,62.58222938232858,6.527951535033989,0.7727104731883144,in_support,local_perturbation,False,9.0,bootstrap_coverage
+7,cand_000290,v2_74bd7b4dd0a7,ethylene glycol + PVP,round_candidate,screening_candidate,model_supported,61.042974059094675,10.63031664482287,0.486389992768886,in_support,local_perturbation,False,8.0,bootstrap_coverage
+8,cand_001885,v2_058f0d84ea0e,DMSO + proline + creatine +1,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,boundary_probe,True,2.0,bootstrap_coverage
+9,cand_001965,v2_f87d5e9bf5a4,DMSO + glucose + HSA,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,boundary_probe,True,3.0,bootstrap_coverage
+10,cand_001923,v2_ee0e6b6d09bd,DMSO + glucose + FBS,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,boundary_probe,False,7.0,bootstrap_coverage
+11,cand_001589,v2_4d49c0b641bb,glucose + creatine + methylcellulose,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,boundary_probe,False,5.0,bootstrap_coverage
+12,cand_001515,v2_a4c0156ecbf5,DMSO + trehalose + creatine,round_candidate,screening_candidate,unknown_prior_reversion,,,0.5,in_support,boundary_probe,True,4.0,bootstrap_coverage

@@ -47,6 +47,20 @@
     false,
     true
   ],
+  "mechanical_transition_roles": [
+    "",
+    "",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_utility",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_coverage",
+    "bootstrap_coverage"
+  ],
   "viability_prediction_status": [
     "observed_retest",
     "observed_retest",

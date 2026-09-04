@@ -1,0 +1,1 @@
+Formal frozen predictions are compared with later experiments, with model error, uncertainty magnitude, empirical coverage, and intact feasibility kept distinct. The positive viability bias and sub-nominal 95% coverage remain visible rather than being summarized as recommendation success. Mechanical validation metrics are omitted because no critical-load outcomes exist.

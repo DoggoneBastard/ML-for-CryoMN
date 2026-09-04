@@ -1,0 +1,1 @@
+A structural preview of the future viability–load trade-off map. All mechanics values in this concept are deterministic synthetic layout data because V2 has no measured critical-load observations. Failed-intact points are explicitly excluded from the demonstration frontier, while recommendations remain visually distinct from observations.

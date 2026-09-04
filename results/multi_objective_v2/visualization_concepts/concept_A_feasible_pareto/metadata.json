@@ -1,0 +1,21 @@
+{
+  "prototype_policy": "v2_visualization_concepts_v1",
+  "cohort": "layout demonstration only",
+  "seed": 42,
+  "reference_point": {
+    "viability_percent": 0.0,
+    "critical_axial_load_N_per_needle": 0.0
+  },
+  "synthetic_data_status": "synthetic_mechanics_layout_demo",
+  "endpoint_counts": {
+    "viability_percent": 628,
+    "intact_patch_formation_pass": 168
+  },
+  "data_hashes": {
+    "formulations": "6fc130706d482c4ced6bf610b4048f78158de577735181b4e4e7104999a16059",
+    "observations": "98148650e4d9d3a4c5ed5458982230158ba5a353b30ab89eef842913e6c4518e",
+    "candidates": "658fd5fd00414e2c373d90e5f05bf4a8897458ebf8c14002ab15818f34f06132",
+    "prospective_table": "6ecd0374d877f221da909399b799ea8abb91068d0290a256a06a44bd41cca645"
+  },
+  "excluded_from_scientific_metrics": true
+}
