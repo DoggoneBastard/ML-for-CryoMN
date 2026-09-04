@@ -12,12 +12,20 @@ import numpy as np
 import pandas as pd
 
 try:
-    from .paths import NEXT_ROUND_CANDIDATES_PATH, OBSERVATIONS_PATH
+    from .paths import (
+        NEXT_ROUND_CANDIDATES_PATH,
+        OBSERVATIONS_PATH,
+        portable_source_path,
+    )
 except ImportError:  # pragma: no cover - direct script execution fallback
     V2_ROOT = Path(__file__).resolve().parents[1]
     if str(V2_ROOT) not in sys.path:
         sys.path.insert(0, str(V2_ROOT))
-    from helper.paths import NEXT_ROUND_CANDIDATES_PATH, OBSERVATIONS_PATH
+    from helper.paths import (
+        NEXT_ROUND_CANDIDATES_PATH,
+        OBSERVATIONS_PATH,
+        portable_source_path,
+    )
 
 
 FORCE_PATTERNS = ("load", "force")
@@ -330,7 +338,7 @@ def update_candidate_results(
         frame.at[row_index, "batch_id"] = str(batch_id).strip()
     if not _is_blank(replicate_id):
         frame.at[row_index, "replicate_id"] = str(replicate_id).strip()
-    frame.at[row_index, "instron_file"] = str(Path(instron_csv_path))
+    frame.at[row_index, "instron_file"] = portable_source_path(instron_csv_path)
     frame.at[row_index, "needles_compressed"] = int(metrics.needles_compressed)
     frame.at[row_index, "critical_axial_load_N_per_needle"] = float(metrics.critical_axial_load_N_per_needle)
     frame.at[row_index, "critical_axial_load_N_total"] = float(metrics.critical_axial_load_N_total)
@@ -354,7 +362,7 @@ def append_observations(
         formulation_id=formulation_id,
         batch_id=batch_id,
         replicate_id=replicate_id,
-        source_file=source_file,
+        source_file=portable_source_path(source_file),
     )
     output = Path(output_path)
     if output.exists() and output.stat().st_size > 0:
@@ -413,7 +421,7 @@ def main() -> None:
             formulation_id=str(args.formulation_id),
             batch_id=str(args.batch_id),
             replicate_id=str(args.replicate_id),
-            source_file=str(Path(args.csv)),
+            source_file=portable_source_path(args.csv),
         )
         destination = f"Updated observations: {output_path.resolve()}"
     else:

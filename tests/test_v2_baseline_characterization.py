@@ -52,6 +52,14 @@ class V2BaselineCharacterizationTests(unittest.TestCase):
         self.assertEqual(list(observations.shape), self.baseline["observations_shape"])
         self.assertEqual(_sha256(FORMULATIONS_PATH), self.baseline["formulations_sha256"])
         self.assertEqual(_sha256(OBSERVATIONS_PATH), self.baseline["observations_sha256"])
+        self.assertEqual(
+            _sha256(PROJECT_ROOT / "data" / "processed" / "parsed_formulations.csv"),
+            self.baseline["legacy_literature_input_sha256"],
+        )
+        self.assertEqual(
+            _sha256(PROJECT_ROOT / "data" / "validation" / "validation_results.csv"),
+            self.baseline["legacy_validation_input_sha256"],
+        )
 
         endpoint_counts = observations["endpoint"].value_counts().to_dict()
         for endpoint, expected in self.baseline["endpoint_counts"].items():

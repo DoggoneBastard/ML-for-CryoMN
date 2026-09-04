@@ -2,6 +2,8 @@
   "baseline_commit": "7e86815",
   "formulations_sha256": "6fc130706d482c4ced6bf610b4048f78158de577735181b4e4e7104999a16059",
   "observations_sha256": "98148650e4d9d3a4c5ed5458982230158ba5a353b30ab89eef842913e6c4518e",
+  "legacy_literature_input_sha256": "28005dff42e93fd5d5d58ae58626fc0f1b6dae77724bb662839df1821ee58a8f",
+  "legacy_validation_input_sha256": "e73fd5644cb77b42512d7eb4129b3c1fe994fb58861eaba2247b893d599317b8",
   "formulations_shape": [392, 29],
   "observations_shape": [796, 11],
   "endpoint_counts": {
