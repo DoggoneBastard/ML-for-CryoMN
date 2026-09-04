@@ -4,6 +4,9 @@ This lane is intentionally separated from the legacy viability-only pipeline.
 Only numbered directories contain executable workflow stages. Non-executable
 implementation code lives in `helper/`.
 
+For a plain-language map of the data, model, selection, validation, and report
+modules, see [V2 Architecture](ARCHITECTURE.md).
+
 ## Main Database
 
 The selector reads the v2 database from:
