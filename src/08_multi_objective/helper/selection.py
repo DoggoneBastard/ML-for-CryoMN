@@ -142,72 +142,6 @@ class SelectionResult:
     metadata: dict
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def select_mechanical_tests(*args, **kwargs):
     """Compatibility bridge for callers patching the former module internals."""
 
@@ -219,67 +153,26 @@ def select_mechanical_tests(*args, **kwargs):
         _selection_policy._mechanics_phase_scores = original
 
 
-def select_next_round(
+def _prepare_and_score_candidate_pool(
     formulations: pd.DataFrame,
     observations: pd.DataFrame,
     candidate_pool: pd.DataFrame,
     registry: IngredientRegistry,
     optimization_config: Mapping,
-    requested_phase_mode: str | None = None,
-    target_round_number: int | None = None,
-    policy_active: bool = False,
-    policy_version: str | None = None,
-    similarity_audit: SimilarityAudit | None = None,
-    unavailable_feature_names: list[str] | tuple[str, ...] = (),
-) -> SelectionResult:
-    if policy_version is None:
-        policy_version = policy_activation(
-            optimization_config,
-            target_round_number,
-        )[1]
-    models = train_endpoint_models(
-        formulations,
-        observations,
-        registry,
-        optimization_config=dict(optimization_config),
-    )
-    intact_combination_policy = resolve_intact_combination_policy(
-        optimization_config,
-        target_round_number,
-    )
-    intact_evidence = build_intact_evidence(
-        formulations,
-        observations,
-        registry,
-        intact_combination_policy,
-        target_round_number,
-    )
-    cold_start_policy = resolve_cold_start_policy(
-        optimization_config,
-        target_round_number,
-    )
-    cold_start_context = build_cold_start_context(
-        formulations,
-        observations,
-        registry,
-        cold_start_policy,
-        target_round_number,
-        unavailable_feature_names=unavailable_feature_names,
-    )
-    phase_resolution = resolve_phase_mode(
-        formulations,
-        observations,
-        registry,
-        optimization_config,
-        requested_phase_mode=requested_phase_mode,
-        target_round_number=target_round_number,
-    )
-    similarity_policy = resolve_similarity_policy(
-        optimization_config,
-        target_round_number,
-    )
-    if similarity_audit is None:
-        similarity_audit = SimilarityAudit(similarity_policy)
+    models: EndpointModels,
+    phase_resolution: PhaseResolution,
+    similarity_policy,
+    similarity_audit: SimilarityAudit,
+    intact_combination_policy: IntactCombinationPolicy,
+    intact_evidence,
+    cold_start_context: ColdStartContext,
+    target_round_number: int | None,
+    policy_active: bool,
+    policy_version: str,
+    unavailable_feature_names: list[str] | tuple[str, ...],
+) -> tuple[pd.DataFrame, dict]:
+    """Prepare evidence, annotate predictions, and apply phase-appropriate scores."""
+
     continuous_metadata = {
         "continuous_optimizer_enabled": False,
         "continuous_optimizer_used": False,
@@ -662,106 +555,47 @@ def select_next_round(
     else:
         annotated["mechanics_phase_score"] = np.nan
         annotated["hybrid_phase_score"] = np.nan
+    return annotated, {
+        "continuous_metadata": continuous_metadata,
+        "retest_candidates_rejected_by_feasibility": retest_candidates_rejected_by_feasibility,
+        "retest_policy_metadata": retest_policy_metadata,
+        "retest_audit_rows": retest_audit_rows,
+        "anchor_metadata": anchor_metadata,
+        "zero_active_filtered_count": zero_active_filtered_count,
+        "pool_selection_metadata": pool_selection_metadata,
+    }
 
-    n_viability = int(nested_get(optimization_config, "round_policy.viability_screens_per_round", 12))
-    n_mechanical = int(
-        nested_get(
-            optimization_config,
-            "mechanics_transition.bootstrap.mechanical_capacity",
-            4,
-        )
-    )
-    if len(annotated) < n_viability:
-        raise ValueError(
-            "Candidate pool contains fewer rows than the required viability slate "
-            f"after active filters: {len(annotated)}/{n_viability}."
-        )
 
-    viability_screen = _select_round_slate(
-        annotated,
-        registry,
-        optimization_config,
-        phase_resolution,
-        n=n_viability,
-        policy_active=policy_active,
-        target_round_number=target_round_number,
-        cold_start_context=cold_start_context,
-    )
-    mechanical_tests, mechanical_metadata = select_mechanical_tests(
-        viability_screen,
-        models,
-        registry,
-        optimization_config,
-        phase_resolution,
-        n=n_mechanical,
-        intact_policy=intact_combination_policy,
-    )
-    similarity_validation = validate_selected_similarity(
-        viability_screen,
-        formulations,
-        observations,
-        registry,
-        similarity_policy,
-    )
-    selected_pair_counts = _shared_pair_counts(viability_screen, registry)
-    shared_pair_cap = int(
-        nested_get(
-            optimization_config,
-            "selection.max_candidates_per_shared_ingredient_pair",
-            5,
-        )
-    )
-    ingredient_frequency_cap = int(
-        nested_get(
-            optimization_config,
-            "selection.max_candidates_per_ingredient",
-            5,
-        )
-    )
-    ingredient_frequency_start_round = int(
-        nested_get(
-            optimization_config,
-            "selection.ingredient_frequency_start_round",
-            3,
-        )
-    )
-    ingredient_frequency_active = bool(
-        target_round_number is not None
-        and int(target_round_number) >= ingredient_frequency_start_round
-    )
-    ingredient_frequency_metadata = dict(
-        viability_screen.attrs.get(
-            "ingredient_frequency_diversity",
-            {},
-        )
-    )
-    final_ingredient_counts = _ingredient_appearance_counts(
-        viability_screen,
-        registry,
-    )
-    if ingredient_frequency_active:
-        frequency_violations = {
-            feature_name: count
-            for feature_name, count in final_ingredient_counts.items()
-            if count > ingredient_frequency_cap
-        }
-        if frequency_violations:
-            raise ValueError(
-                "Final selected slate violates the active marginal ingredient "
-                f"frequency policy: {frequency_violations}."
-            )
-    selected_retest_ids = set(
-        viability_screen.loc[
-            viability_screen["recommendation_type"].astype(str)
-            == "retest_priority",
-            "formulation_id",
-        ].astype(str)
-    )
-    retest_policy_metadata["selected_candidates"] = [
-        row
-        for row in retest_audit_rows
-        if str(row.get("formulation_id", "")) in selected_retest_ids
-    ]
+def _assemble_selection_metadata(
+    annotated: pd.DataFrame,
+    viability_screen: pd.DataFrame,
+    mechanical_tests: pd.DataFrame,
+    mechanical_metadata: dict,
+    phase_resolution: PhaseResolution,
+    anchor_metadata: dict,
+    pool_selection_metadata: dict,
+    continuous_metadata: dict,
+    retest_candidates_rejected_by_feasibility: int,
+    retest_policy_metadata: dict,
+    models: EndpointModels,
+    optimization_config: Mapping,
+    target_round_number: int | None,
+    similarity_audit: SimilarityAudit,
+    similarity_validation: dict,
+    intact_combination_policy: IntactCombinationPolicy,
+    intact_evidence,
+    cold_start_context: ColdStartContext,
+    selected_pair_counts: dict,
+    shared_pair_cap: int,
+    ingredient_frequency_cap: int,
+    ingredient_frequency_start_round: int,
+    ingredient_frequency_active: bool,
+    ingredient_frequency_metadata: dict,
+    final_ingredient_counts: dict,
+    zero_active_filtered_count: int,
+) -> dict:
+    """Assemble the auditable protocol record without changing the selection."""
+
     surrogate_config = (
         nested_get(optimization_config, "surrogate_model", {}) or {}
     )
@@ -990,6 +824,225 @@ def select_next_round(
             ),
         },
     }
+    return metadata
+
+
+def select_next_round(
+    formulations: pd.DataFrame,
+    observations: pd.DataFrame,
+    candidate_pool: pd.DataFrame,
+    registry: IngredientRegistry,
+    optimization_config: Mapping,
+    requested_phase_mode: str | None = None,
+    target_round_number: int | None = None,
+    policy_active: bool = False,
+    policy_version: str | None = None,
+    similarity_audit: SimilarityAudit | None = None,
+    unavailable_feature_names: list[str] | tuple[str, ...] = (),
+) -> SelectionResult:
+    if policy_version is None:
+        policy_version = policy_activation(
+            optimization_config,
+            target_round_number,
+        )[1]
+    models = train_endpoint_models(
+        formulations,
+        observations,
+        registry,
+        optimization_config=dict(optimization_config),
+    )
+    intact_combination_policy = resolve_intact_combination_policy(
+        optimization_config,
+        target_round_number,
+    )
+    intact_evidence = build_intact_evidence(
+        formulations,
+        observations,
+        registry,
+        intact_combination_policy,
+        target_round_number,
+    )
+    cold_start_policy = resolve_cold_start_policy(
+        optimization_config,
+        target_round_number,
+    )
+    cold_start_context = build_cold_start_context(
+        formulations,
+        observations,
+        registry,
+        cold_start_policy,
+        target_round_number,
+        unavailable_feature_names=unavailable_feature_names,
+    )
+    phase_resolution = resolve_phase_mode(
+        formulations,
+        observations,
+        registry,
+        optimization_config,
+        requested_phase_mode=requested_phase_mode,
+        target_round_number=target_round_number,
+    )
+    similarity_policy = resolve_similarity_policy(
+        optimization_config,
+        target_round_number,
+    )
+    if similarity_audit is None:
+        similarity_audit = SimilarityAudit(similarity_policy)
+    annotated, preparation = _prepare_and_score_candidate_pool(
+        formulations=formulations,
+        observations=observations,
+        candidate_pool=candidate_pool,
+        registry=registry,
+        optimization_config=optimization_config,
+        models=models,
+        phase_resolution=phase_resolution,
+        similarity_policy=similarity_policy,
+        similarity_audit=similarity_audit,
+        intact_combination_policy=intact_combination_policy,
+        intact_evidence=intact_evidence,
+        cold_start_context=cold_start_context,
+        target_round_number=target_round_number,
+        policy_active=policy_active,
+        policy_version=policy_version,
+        unavailable_feature_names=unavailable_feature_names,
+    )
+    continuous_metadata = preparation["continuous_metadata"]
+    retest_candidates_rejected_by_feasibility = preparation[
+        "retest_candidates_rejected_by_feasibility"
+    ]
+    retest_policy_metadata = preparation["retest_policy_metadata"]
+    retest_audit_rows = preparation["retest_audit_rows"]
+    anchor_metadata = preparation["anchor_metadata"]
+    zero_active_filtered_count = preparation["zero_active_filtered_count"]
+    pool_selection_metadata = preparation["pool_selection_metadata"]
+
+    n_viability = int(nested_get(optimization_config, "round_policy.viability_screens_per_round", 12))
+    n_mechanical = int(
+        nested_get(
+            optimization_config,
+            "mechanics_transition.bootstrap.mechanical_capacity",
+            4,
+        )
+    )
+    if len(annotated) < n_viability:
+        raise ValueError(
+            "Candidate pool contains fewer rows than the required viability slate "
+            f"after active filters: {len(annotated)}/{n_viability}."
+        )
+
+    viability_screen = _select_round_slate(
+        annotated,
+        registry,
+        optimization_config,
+        phase_resolution,
+        n=n_viability,
+        policy_active=policy_active,
+        target_round_number=target_round_number,
+        cold_start_context=cold_start_context,
+    )
+    mechanical_tests, mechanical_metadata = select_mechanical_tests(
+        viability_screen,
+        models,
+        registry,
+        optimization_config,
+        phase_resolution,
+        n=n_mechanical,
+        intact_policy=intact_combination_policy,
+    )
+    similarity_validation = validate_selected_similarity(
+        viability_screen,
+        formulations,
+        observations,
+        registry,
+        similarity_policy,
+    )
+    selected_pair_counts = _shared_pair_counts(viability_screen, registry)
+    shared_pair_cap = int(
+        nested_get(
+            optimization_config,
+            "selection.max_candidates_per_shared_ingredient_pair",
+            5,
+        )
+    )
+    ingredient_frequency_cap = int(
+        nested_get(
+            optimization_config,
+            "selection.max_candidates_per_ingredient",
+            5,
+        )
+    )
+    ingredient_frequency_start_round = int(
+        nested_get(
+            optimization_config,
+            "selection.ingredient_frequency_start_round",
+            3,
+        )
+    )
+    ingredient_frequency_active = bool(
+        target_round_number is not None
+        and int(target_round_number) >= ingredient_frequency_start_round
+    )
+    ingredient_frequency_metadata = dict(
+        viability_screen.attrs.get(
+            "ingredient_frequency_diversity",
+            {},
+        )
+    )
+    final_ingredient_counts = _ingredient_appearance_counts(
+        viability_screen,
+        registry,
+    )
+    if ingredient_frequency_active:
+        frequency_violations = {
+            feature_name: count
+            for feature_name, count in final_ingredient_counts.items()
+            if count > ingredient_frequency_cap
+        }
+        if frequency_violations:
+            raise ValueError(
+                "Final selected slate violates the active marginal ingredient "
+                f"frequency policy: {frequency_violations}."
+            )
+    selected_retest_ids = set(
+        viability_screen.loc[
+            viability_screen["recommendation_type"].astype(str)
+            == "retest_priority",
+            "formulation_id",
+        ].astype(str)
+    )
+    retest_policy_metadata["selected_candidates"] = [
+        row
+        for row in retest_audit_rows
+        if str(row.get("formulation_id", "")) in selected_retest_ids
+    ]
+    metadata = _assemble_selection_metadata(
+        annotated=annotated,
+        viability_screen=viability_screen,
+        mechanical_tests=mechanical_tests,
+        mechanical_metadata=mechanical_metadata,
+        phase_resolution=phase_resolution,
+        anchor_metadata=anchor_metadata,
+        pool_selection_metadata=pool_selection_metadata,
+        continuous_metadata=continuous_metadata,
+        retest_candidates_rejected_by_feasibility=retest_candidates_rejected_by_feasibility,
+        retest_policy_metadata=retest_policy_metadata,
+        models=models,
+        optimization_config=optimization_config,
+        target_round_number=target_round_number,
+        similarity_audit=similarity_audit,
+        similarity_validation=similarity_validation,
+        intact_combination_policy=intact_combination_policy,
+        intact_evidence=intact_evidence,
+        cold_start_context=cold_start_context,
+        selected_pair_counts=selected_pair_counts,
+        shared_pair_cap=shared_pair_cap,
+        ingredient_frequency_cap=ingredient_frequency_cap,
+        ingredient_frequency_start_round=ingredient_frequency_start_round,
+        ingredient_frequency_active=ingredient_frequency_active,
+        ingredient_frequency_metadata=ingredient_frequency_metadata,
+        final_ingredient_counts=final_ingredient_counts,
+        zero_active_filtered_count=zero_active_filtered_count,
+    )
     return SelectionResult(
         viability_screen=viability_screen,
         mechanical_tests=mechanical_tests,
@@ -1014,4 +1067,3 @@ def write_selection_result(
         total_candidate_pool_path=total_candidate_pool_path,
         registry=registry,
     )
-

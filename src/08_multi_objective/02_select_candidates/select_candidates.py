@@ -13,6 +13,7 @@ if str(V2_ROOT) not in sys.path:
 
 from helper.candidate_workflow import (
     CandidateSelectionOptions,
+    CandidateSelectionWorkflowResult,
     run_candidate_selection,
 )
 from helper.paths import (
@@ -71,23 +72,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    workflow = run_candidate_selection(
-        CandidateSelectionOptions(
-            formulations_path=args.formulations,
-            observations_path=args.observations,
-            candidate_pool_path=args.candidate_pool,
-            availability_config_path=args.availability_config,
-            output_dir=args.output_dir,
-            total_candidate_pool_path=args.total_candidate_pool,
-            pool_size=args.pool_size,
-            seed=args.seed,
-            phase_mode=args.phase_mode,
-            batch_id=args.batch_id,
-            supersede_unstarted_proposal=args.supersede_unstarted_proposal,
-        )
-    )
+def _present_completion(
+    args: argparse.Namespace,
+    workflow: CandidateSelectionWorkflowResult,
+) -> None:
+    """Print the existing command-line completion summary."""
     result = workflow.selection_result
     metadata = result.metadata
     if workflow.superseded_proposal_path is not None:
@@ -154,6 +143,24 @@ def main() -> None:
     print(f"Round status: {workflow.artifact_paths['round_status'].resolve()}")
 
 
+def main() -> None:
+    args = parse_args()
+    options = CandidateSelectionOptions(
+        formulations_path=args.formulations,
+        observations_path=args.observations,
+        candidate_pool_path=args.candidate_pool,
+        availability_config_path=args.availability_config,
+        output_dir=args.output_dir,
+        total_candidate_pool_path=args.total_candidate_pool,
+        pool_size=args.pool_size,
+        seed=args.seed,
+        phase_mode=args.phase_mode,
+        batch_id=args.batch_id,
+        supersede_unstarted_proposal=args.supersede_unstarted_proposal,
+    )
+    workflow = run_candidate_selection(options)
+    _present_completion(args, workflow)
+
+
 if __name__ == "__main__":
     main()
-
