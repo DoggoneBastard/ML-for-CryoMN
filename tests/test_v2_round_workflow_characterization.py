@@ -77,6 +77,20 @@ class V2RoundWorkflowCharacterizationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unranked"):
             validate_mechanics_execution(completed, proposal, primary_capacity=4)
 
+    def test_mechanical_data_without_confirmed_intact_pass_is_rejected(self) -> None:
+        proposal = pd.read_csv(
+            PROJECT_ROOT
+            / "results"
+            / "multi_objective_v2"
+            / "next_round"
+            / "next_round_candidates.csv"
+        )
+        completed = proposal.copy()
+        ranked = completed["mechanical_selection_rank"].notna().idxmax()
+        completed.loc[ranked, "critical_axial_load_N_per_needle"] = 1.0
+        with self.assertRaisesRegex(ValueError, "without a measured intact pass"):
+            validate_mechanics_execution(completed, proposal, primary_capacity=4)
+
 
 if __name__ == "__main__":
     unittest.main()

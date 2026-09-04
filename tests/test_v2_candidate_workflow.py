@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import importlib.util
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -22,11 +24,61 @@ from helper.paths import FORMULATIONS_PATH, OBSERVATIONS_PATH  # noqa: E402
 from helper.registry import load_registry  # noqa: E402
 
 
+def _load_selection_cli_module():
+    path = V2_ROOT / "02_select_candidates" / "select_candidates.py"
+    spec = importlib.util.spec_from_file_location("v2_select_candidates_cli", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class V2CandidateWorkflowTests(unittest.TestCase):
     def test_options_are_immutable(self) -> None:
         options = CandidateSelectionOptions()
         with self.assertRaises(FrozenInstanceError):
             options.seed = 7  # type: ignore[misc]
+
+    def test_cli_arguments_map_to_existing_option_names(self) -> None:
+        module = _load_selection_cli_module()
+        arguments = [
+            "select_candidates.py",
+            "--formulations",
+            "formulations.csv",
+            "--observations",
+            "observations.csv",
+            "--candidate-pool",
+            "pool.csv",
+            "--availability-config",
+            "availability.yaml",
+            "--output-dir",
+            "next_round",
+            "--total-candidate-pool",
+            "total.csv",
+            "--pool-size",
+            "321",
+            "--seed",
+            "42",
+            "--phase-mode",
+            "mechanics_bootstrap",
+            "--batch-id",
+            "ROUND_009",
+            "--supersede-unstarted-proposal",
+        ]
+        with patch.object(sys, "argv", arguments):
+            parsed = module.parse_args()
+        self.assertEqual(parsed.formulations, "formulations.csv")
+        self.assertEqual(parsed.observations, "observations.csv")
+        self.assertEqual(parsed.candidate_pool, "pool.csv")
+        self.assertEqual(parsed.availability_config, "availability.yaml")
+        self.assertEqual(parsed.output_dir, "next_round")
+        self.assertEqual(parsed.total_candidate_pool, "total.csv")
+        self.assertEqual(parsed.pool_size, 321)
+        self.assertEqual(parsed.seed, 42)
+        self.assertEqual(parsed.phase_mode, "mechanics_bootstrap")
+        self.assertEqual(parsed.batch_id, "ROUND_009")
+        self.assertTrue(parsed.supersede_unstarted_proposal)
 
     def test_empty_formulation_table_fails_before_outputs_are_written(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_name:

@@ -20,6 +20,16 @@ PROPOSAL_PATH = (
     / "next_round"
     / "next_round_candidates.csv"
 )
+CANDIDATE_POOL_PATH = (
+    PROJECT_ROOT / "results" / "multi_objective_v2" / "total_candidate_pool.csv"
+)
+SELECTION_METADATA_PATH = (
+    PROJECT_ROOT
+    / "results"
+    / "multi_objective_v2"
+    / "next_round"
+    / "next_round_metadata.json"
+)
 METRICS_PATH = (
     PROJECT_ROOT
     / "results"
@@ -37,6 +47,13 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _ordered_columns_sha256(frame: pd.DataFrame) -> str:
+    encoded = json.dumps(
+        list(frame.columns), separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 class V2BaselineCharacterizationTests(unittest.TestCase):
@@ -105,6 +122,73 @@ class V2BaselineCharacterizationTests(unittest.TestCase):
                 if metric == "n_evaluated":
                     continue
                 self.assertAlmostEqual(float(row[metric]), float(value), places=10)
+
+    def test_configuration_policy_schema_and_fixed_predictions(self) -> None:
+        for name, expected_hash in self.baseline["config_sha256"].items():
+            self.assertEqual(
+                _sha256(PROJECT_ROOT / "config_v2" / name),
+                expected_hash,
+            )
+
+        proposal = pd.read_csv(PROPOSAL_PATH)
+        candidate_pool = pd.read_csv(CANDIDATE_POOL_PATH)
+        for frame, key in (
+            (proposal, "proposal"),
+            (candidate_pool, "total_candidate_pool"),
+        ):
+            expected = self.baseline["output_schemas"][key]
+            self.assertEqual(len(frame.columns), expected["column_count"])
+            self.assertEqual(
+                _ordered_columns_sha256(frame),
+                expected["ordered_columns_sha256"],
+            )
+
+        metadata = json.loads(SELECTION_METADATA_PATH.read_text(encoding="utf-8"))
+        expected_policies = self.baseline["policy_versions"]
+        self.assertEqual(
+            metadata["formulation_feasibility_policy_version"],
+            expected_policies["formulation_feasibility"],
+        )
+        self.assertEqual(
+            metadata["formulation_similarity"]["policy_version"],
+            expected_policies["formulation_similarity"],
+        )
+        self.assertEqual(
+            metadata["cold_start_policy"]["policy_version"],
+            expected_policies["cold_start"],
+        )
+        self.assertEqual(
+            metadata["mechanics_transition"]["policy_version"],
+            expected_policies["mechanics_transition"],
+        )
+
+        numeric_columns = [
+            "predicted_viability_percent",
+            "viability_std",
+            "raw_surrogate_viability_mean",
+            "raw_surrogate_viability_std",
+            "predicted_critical_axial_load_N_per_needle",
+            "critical_axial_load_std",
+            "screening_phase_score",
+        ]
+        indexed = proposal.set_index("candidate_id")
+        for expected in self.baseline["fixed_prediction_subset"]:
+            row = indexed.loc[expected["candidate_id"]]
+            for column in numeric_columns:
+                expected_value = expected[column]
+                if expected_value is None:
+                    self.assertTrue(pd.isna(row[column]), column)
+                else:
+                    np.testing.assert_allclose(
+                        float(row[column]),
+                        float(expected_value),
+                        rtol=1e-6,
+                        atol=1e-8,
+                    )
+            self.assertEqual(
+                bool(row["mechanical_test_recommended"]),
+                expected["mechanical_test_recommended"],
+            )
 
 
 if __name__ == "__main__":

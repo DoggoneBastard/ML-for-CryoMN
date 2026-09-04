@@ -92,5 +92,72 @@
     "critical_axial_load_N_per_needle": {
       "n_evaluated": 0
     }
-  }
+  },
+  "environment": {
+    "python": "3.14.6",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0",
+    "scipy": "1.17.1",
+    "matplotlib": "3.11.0",
+    "pyyaml": "6.0.3"
+  },
+  "config_sha256": {
+    "availability.yaml": "973c9c7469a8493dd36bf441af1b920b86b27f50e99aa262f865a914ce74f2d4",
+    "endpoints.yaml": "01378ef205a763b96bdcedb846fdc3f02d6d4ea58afd5d07f0eb61b0a449a753",
+    "evaluation.yaml": "19db1119a078083d40d254294a3073f261d3da791f88cd14371d98615e12afb7",
+    "ingredients.yaml": "3bba2bc62572380ae772967220f8fded09152257679d0fa9570a966465af0634",
+    "optimization.yaml": "1f015cf829927623c0d67cab6705871856bd33e853caa5b7bf9e439262ea98c7"
+  },
+  "policy_versions": {
+    "formulation_feasibility": "round5_solubility_viscosity_v2",
+    "formulation_similarity": "round3_formulation_similarity_v1",
+    "cold_start": "round6_cold_start_graduation_v1",
+    "mechanics_transition": "mechanics_transition_v1"
+  },
+  "output_schemas": {
+    "proposal": {
+      "column_count": 132,
+      "ordered_columns_sha256": "f070cdc4d7ad837b5bb260bc2a0b5002ff0ae6a86f9505c437182e9a888b51f5"
+    },
+    "total_candidate_pool": {
+      "column_count": 114,
+      "ordered_columns_sha256": "ab18c6c8d6e00f9d734d0b1d4b2d537ae3c4d15c1daf2f68f7ed0b02a96d4257"
+    }
+  },
+  "fixed_prediction_subset": [
+    {
+      "candidate_id": "cand_001149",
+      "predicted_viability_percent": null,
+      "viability_std": null,
+      "raw_surrogate_viability_mean": 53.379627807029664,
+      "raw_surrogate_viability_std": 25.7532990357919,
+      "predicted_critical_axial_load_N_per_needle": 0.0,
+      "critical_axial_load_std": 0.0,
+      "screening_phase_score": 0.7494547581722508,
+      "mechanical_test_recommended": false
+    },
+    {
+      "candidate_id": "rescue_000027",
+      "predicted_viability_percent": 63.11232909226954,
+      "viability_std": 2.9171553972520927,
+      "raw_surrogate_viability_mean": 63.11232909226954,
+      "raw_surrogate_viability_std": 2.9171553972520927,
+      "predicted_critical_axial_load_N_per_needle": 0.0,
+      "critical_axial_load_std": 0.0,
+      "screening_phase_score": 0.5621980544328977,
+      "mechanical_test_recommended": false
+    },
+    {
+      "candidate_id": "cand_001152",
+      "predicted_viability_percent": 60.63482823754864,
+      "viability_std": 11.217318148971897,
+      "raw_surrogate_viability_mean": 60.63482823754864,
+      "raw_surrogate_viability_std": 11.217318148971897,
+      "predicted_critical_axial_load_N_per_needle": 0.0,
+      "critical_axial_load_std": 0.0,
+      "screening_phase_score": 0.7754025109451338,
+      "mechanical_test_recommended": true
+    }
+  ]
 }

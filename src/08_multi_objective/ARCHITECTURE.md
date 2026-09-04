@@ -5,6 +5,10 @@ single-objective project is a completed, read-only scientific reference. V2 may
 read its CSV outputs during a deliberate database rebuild, but it does not edit
 legacy files or import legacy runtime code.
 
+The completed implementation, verification, and Section 4 problem mapping are
+recorded in `REFACTOR_REPORT.md`; the corresponding machine-readable audit is
+`REGRESSION_REPORT.json`.
+
 ## 1. What V2 optimizes
 
 V2 has two quantities that the optimizer tries to maximize:
