@@ -13,9 +13,9 @@ Formulations with observed intact-patch gate: 78
 
 Generated files:
 - best_performers_summary.txt
-- endpoint_observation_counts.png
+- observed_tradeoff.png
 - model_evaluation_table.csv
-- model_evaluation_overview.png
+- diagnostics_1.png
 
 Reader note:
 This review snapshot captures one specific state of the round workflow.

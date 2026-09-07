@@ -96,39 +96,11 @@ else:
 
 
 if __package__ in (None, ""):
-    from helper.evaluation_plots import (
-    _artifact_path,
-    _apply_plot_style,
-    _format_metric,
-    _save_endpoint_counts,
-    _save_observed_performance_landscape,
-    _save_placeholder,
-    _plot_parity_axis,
-    _plot_probability_axis,
-    _save_model_evaluation_overview,
-    _save_multiobjective_parity_plot,
-    _save_candidate_plot,
-    _save_hv_igd_plot,
-    _save_pareto_progression_plot,
-    _save_endpoint_r2_plot,
-    )
+    from helper.evaluation_plots import _artifact_path, _format_metric
+    from helper.plot_reporting import write_decision, write_pareto, write_diagnostics, prepare_diagnostics
 else:
-    from .evaluation_plots import (
-    _artifact_path,
-    _apply_plot_style,
-    _format_metric,
-    _save_endpoint_counts,
-    _save_observed_performance_landscape,
-    _save_placeholder,
-    _plot_parity_axis,
-    _plot_probability_axis,
-    _save_model_evaluation_overview,
-    _save_multiobjective_parity_plot,
-    _save_candidate_plot,
-    _save_hv_igd_plot,
-    _save_pareto_progression_plot,
-    _save_endpoint_r2_plot,
-    )
+    from .evaluation_plots import _artifact_path, _format_metric
+    from .plot_reporting import write_decision, write_pareto, write_diagnostics, prepare_diagnostics
 
 PAGE_BG = "#f7f2e8"
 AX_BG = "#fffdf8"
@@ -558,210 +530,57 @@ def _write_visualization_summary(
     return output_path
 
 
-def generate_visualization_artifacts(
-    formulations: pd.DataFrame,
-    observations: pd.DataFrame,
-    candidates: pd.DataFrame,
-    output_dir: str | Path,
-    review_label: str = "",
-    artifact_prefix: str = "",
-) -> list[Path]:
-    _apply_plot_style()
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    registry = load_registry()
-    evaluation_frames = _build_model_evaluation_frames(formulations, observations, registry)
-
-    generated = [
-        path
-        for path in [
-            _write_best_performers_summary(
-                formulations,
-                observations,
-                candidates,
-                output_dir,
-                registry,
-                artifact_prefix=artifact_prefix,
-            ),
-            _save_endpoint_counts(observations, output_dir, artifact_prefix=artifact_prefix),
-            _save_observed_performance_landscape(
-                formulations,
-                observations,
-                output_dir,
-                artifact_prefix=artifact_prefix,
-            ),
-            _write_model_evaluation_table(
-                evaluation_frames,
-                output_dir,
-                artifact_prefix=artifact_prefix,
-            ),
-            _save_model_evaluation_overview(
-                formulations,
-                observations,
-                output_dir,
-                registry,
-                artifact_prefix=artifact_prefix,
-            ),
-            _save_candidate_plot(candidates, output_dir, artifact_prefix=artifact_prefix),
-        ]
-        if path is not None
-    ]
-    generated.append(
-        _write_visualization_summary(
-            formulations,
-            observations,
-            candidates,
-            generated,
-            output_dir,
-            review_label=review_label,
-            artifact_prefix=artifact_prefix,
-        )
-    )
+def generate_visualization_artifacts(formulations, observations, candidates, output_dir,
+                                     review_label="", artifact_prefix="") -> list[Path]:
+    output_dir=Path(output_dir);output_dir.mkdir(parents=True,exist_ok=True)
+    registry=load_registry()
+    frames=_build_model_evaluation_frames(formulations,observations,registry)
+    generated=[p for p in [
+        _write_best_performers_summary(formulations,observations,candidates,output_dir,registry,artifact_prefix=artifact_prefix),
+        _write_model_evaluation_table(frames,output_dir,artifact_prefix=artifact_prefix)] if p is not None]
+    generated+=write_pareto(formulations,observations,candidates,output_dir,artifact_prefix,review_label or 'Current evidence')
+    generated+=write_decision(candidates,output_dir,artifact_prefix)
+    generated+=write_diagnostics(prepare_diagnostics(formulations,observations,frames),output_dir,artifact_prefix,review_label or 'Current evidence')
+    generated.append(_write_visualization_summary(formulations,observations,candidates,generated,output_dir,review_label,artifact_prefix))
     return generated
 
 
-def generate_proposal_artifacts(
-    candidates: pd.DataFrame,
-    proposal_dir: str | Path,
-) -> list[Path]:
-    """Generate the proposal-only graphics beneath one round directory."""
-    _apply_plot_style()
-    proposal_dir = Path(proposal_dir)
-    plots_dir = proposal_dir / "plots"
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    candidate_plot = _save_candidate_plot(candidates, plots_dir)
-    return [candidate_plot] if candidate_plot is not None else []
+
+def generate_proposal_artifacts(candidates: pd.DataFrame, proposal_dir: str | Path) -> list[Path]:
+    """Render stored proposal decisions without recomputing assignments."""
+    return write_decision(candidates,Path(proposal_dir)/"plots")
 
 
-def generate_completed_round_artifacts(
-    formulations: pd.DataFrame,
-    observations: pd.DataFrame,
-    completed_candidates: pd.DataFrame,
-    reports_dir: str | Path,
-    batch_id: str,
-) -> list[Path]:
-    """Generate one post-ingestion report bundle for a completed round."""
-    _apply_plot_style()
-    reports_dir = Path(reports_dir)
-    tables_dir = reports_dir / "tables"
-    plots_dir = reports_dir / "plots"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    tables_dir.mkdir(parents=True, exist_ok=True)
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    registry = load_registry()
-    evaluation_frames = _build_model_evaluation_frames(
-        formulations,
-        observations,
-        registry,
-    )
 
-    generated = [
-        path
-        for path in [
-            _write_best_performers_summary(
-                formulations,
-                observations,
-                completed_candidates,
-                reports_dir,
-                registry,
-                candidate_heading=f"{batch_id} completed-round candidates:",
-            ),
-            _save_endpoint_counts(observations, plots_dir),
-            _save_observed_performance_landscape(
-                formulations,
-                observations,
-                plots_dir,
-            ),
-            _write_model_evaluation_table(evaluation_frames, tables_dir),
-            _save_model_evaluation_overview(
-                formulations,
-                observations,
-                plots_dir,
-                registry,
-            ),
-        ]
-        if path is not None
-    ]
-    generated.append(
-        _write_visualization_summary(
-            formulations,
-            observations,
-            completed_candidates,
-            generated,
-            reports_dir,
-            review_label=f"state_after_ingest_{batch_id}",
-            base_name="report_summary",
-        )
-    )
+def generate_completed_round_artifacts(formulations, observations, completed_candidates,
+                                       reports_dir, batch_id) -> list[Path]:
+    reports_dir=Path(reports_dir);plots_dir=reports_dir/'plots';tables_dir=reports_dir/'tables'
+    reports_dir.mkdir(parents=True,exist_ok=True);tables_dir.mkdir(parents=True,exist_ok=True)
+    registry=load_registry();frames=_build_model_evaluation_frames(formulations,observations,registry)
+    generated=[p for p in [
+        _write_best_performers_summary(formulations,observations,completed_candidates,reports_dir,registry,
+                                      candidate_heading=f"{batch_id} completed-round candidates:"),
+        _write_model_evaluation_table(frames,tables_dir)] if p is not None]
+    generated+=write_pareto(formulations,observations,pd.DataFrame(),plots_dir,context=f'State after {batch_id}')
+    generated+=write_diagnostics(prepare_diagnostics(formulations,observations,frames),plots_dir,context=f'State after {batch_id}')
+    generated.append(_write_visualization_summary(formulations,observations,completed_candidates,generated,
+                     reports_dir,review_label=f'state_after_ingest_{batch_id}',base_name='report_summary'))
     return generated
 
 
-def generate_multiobjective_evaluation_artifacts(
-    formulations: pd.DataFrame,
-    observations: pd.DataFrame,
-    output_dir: str | Path,
-    artifact_prefix: str = "",
-) -> list[Path]:
-    _apply_plot_style()
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    registry = load_registry()
 
-    paired = _paired_frame(formulations, observations, registry)
-    metrics = _round_metrics(paired)
-    metrics_path = _artifact_path(output_dir, "multiobjective_round_metrics", ".csv", artifact_prefix)
-    metrics.to_csv(metrics_path, index=False)
+def generate_multiobjective_evaluation_artifacts(formulations, observations, output_dir,
+                                                artifact_prefix="") -> list[Path]:
+    output_dir=Path(output_dir);output_dir.mkdir(parents=True,exist_ok=True)
+    inputs=prepare_diagnostics(formulations,observations)
+    metrics_path=_artifact_path(output_dir,'multiobjective_round_metrics','.csv',artifact_prefix)
+    inputs[2].to_csv(metrics_path,index=False)
+    generated=write_diagnostics(inputs,output_dir,artifact_prefix)
+    generated+=write_pareto(formulations,observations,pd.DataFrame(),output_dir,artifact_prefix)
+    paired=_paired_frame(formulations,observations,load_registry())
+    generated.append(_write_multiobjective_summary(output_dir,paired,inputs[2],generated+[metrics_path],artifact_prefix))
+    return generated+[metrics_path]
 
-    paired_obs = pd.DataFrame()
-    if not paired.empty:
-        paired_keys = set((str(row.formulation_id), str(row.batch_id)) for row in paired.itertuples())
-        paired_obs = observations.loc[
-            observations.apply(
-                lambda row: (str(row.get("formulation_id", "")), str(row.get("batch_id", ""))) in paired_keys,
-                axis=1,
-            )
-        ].copy()
-
-    viability_predictions = (
-        _cross_validated_predictions(formulations, paired_obs, registry, "viability_percent")
-        if not paired_obs.empty
-        else pd.DataFrame()
-    )
-    load_predictions = (
-        _cross_validated_predictions(formulations, paired_obs, registry, "critical_axial_load_N_per_needle")
-        if not paired_obs.empty
-        else pd.DataFrame()
-    )
-
-    generated = [
-        _save_multiobjective_parity_plot(
-            viability_predictions,
-            load_predictions,
-            output_dir,
-            artifact_prefix=artifact_prefix,
-        ),
-        _save_hv_igd_plot(metrics, output_dir, artifact_prefix=artifact_prefix),
-        _save_pareto_progression_plot(paired, output_dir, artifact_prefix=artifact_prefix),
-        _save_endpoint_r2_plot(
-            formulations,
-            observations,
-            metrics,
-            output_dir,
-            registry,
-            artifact_prefix=artifact_prefix,
-        ),
-    ]
-    generated.append(
-        _write_multiobjective_summary(
-            output_dir,
-            paired,
-            metrics,
-            generated + [metrics_path],
-            artifact_prefix=artifact_prefix,
-        )
-    )
-    generated.append(metrics_path)
-    return generated
 
 
 def _parse_cli_args() -> argparse.Namespace:

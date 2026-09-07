@@ -1,1 +1,0 @@
-The operator sheet exposes the active decision evidence for all twelve candidates in selection order. It uses empirical ingredient-combination intact probability, not the diagnostic classifier, and assigns no numeric plotting position to an unreported viability prediction. Mechanical recommendations and ranks are shown as a separate execution decision.

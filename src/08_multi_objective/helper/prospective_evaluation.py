@@ -55,13 +55,8 @@ from .evaluation_metrics import (
     summarize_prospective_metrics,
 )
 
-from .evaluation_plots import (
-    _apply_style,
-    _placeholder_plot,
-    _prediction_plot,
-    _gate_plot,
-    _error_by_round_plot,
-)
+from .plot_reporting import write_prospective
+
 
 PAGE_BG = "#f7f2e8"
 AX_BG = "#fffdf8"
@@ -298,7 +293,6 @@ def generate_round_prospective_artifacts(
     evaluation_config: Mapping[str, Any] | None = None,
 ) -> list[Path]:
     """Generate one completed round's proposal-time evaluation bundle."""
-    _apply_style()
     evaluation_config = dict(evaluation_config or {})
     results_root = Path(results_root)
     reports_dir = round_artifact_paths(batch_id, results_root).reports_dir
@@ -326,14 +320,8 @@ def generate_round_prospective_artifacts(
             _summary_text(table, metrics, evaluation_config, campaign=False),
             encoding="utf-8",
         )
-        _prediction_plot(
-            table,
-            staging / "plots" / "prospective_prediction_vs_observed.png",
-        )
-        _gate_plot(
-            table,
-            staging / "plots" / "prospective_gate_calibration.png",
-        )
+        round_observations=observations.loc[observations.batch_id.astype(str).eq(batch_id)]
+        write_prospective(round_observations,table,metrics,pd.DataFrame(),staging/'plots',f'{batch_id} only; frozen prospective evidence')
         return _promote_tree(staging, reports_dir)
 
 
@@ -353,9 +341,9 @@ def generate_campaign_prospective_artifacts(
     observations: pd.DataFrame,
     results_root: str | Path = RESULTS_V2_DIR,
     evaluation_config: Mapping[str, Any] | None = None,
+    *, include_publication_summary: bool = False,
 ) -> list[Path]:
     """Generate pooled reports over every completed round archive."""
-    _apply_style()
     evaluation_config = dict(evaluation_config or {})
     results_root = Path(results_root)
     output_dir = results_root / "reports" / "prospective"
@@ -388,14 +376,8 @@ def generate_campaign_prospective_artifacts(
             _summary_text(table, metrics, evaluation_config, campaign=True),
             encoding="utf-8",
         )
-        _prediction_plot(
-            table,
-            staging / "plots" / "prospective_prediction_vs_observed.png",
-        )
-        _error_by_round_plot(
-            metrics,
-            staging / "plots" / "prospective_error_by_round.png",
-        )
+        write_prospective(observations,table,metrics,pd.DataFrame(),staging/'plots','Cumulative campaign; frozen prospective evidence',
+                          include_publication_summary=include_publication_summary)
         return _promote_tree(staging, output_dir)
 
 

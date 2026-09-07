@@ -40,7 +40,6 @@ mechanical surrogate,” not a physical load measurement of zero.
 | Completed worksheet | `results/multi_objective_v2/rounds/ROUND_###/completed/` | The validated sheet that was actually ingested. |
 | Round reports | `results/multi_objective_v2/rounds/ROUND_###/reports/` | Prospective validation and completed-round review artifacts. |
 | Campaign report | `results/multi_objective_v2/reports/prospective/` | Evidence accumulated across completed rounds. |
-| Experimental concepts | `results/multi_objective_v2/visualization_concepts/` | Non-production visualization prototypes for review. |
 
 The formulation table answers “what was made?” The observation table answers
 “what happened when it was tested?” Keeping these separate prevents missing
@@ -178,3 +177,5 @@ Stage 3 intentionally preserves the historical transaction boundary. Ingestion
 is not automatically rolled back. After correcting the reporting problem,
 regenerate the requested round or campaign report using Stage 4 rather than
 re-entering or duplicating observations.
+
+Production plots use `helper/plot_data.py` for evidence preparation, `helper/campaign_plots.py` for rendering, and `helper/plot_reporting.py` for bundles. Rendering-only backfill is isolated in `helper/plot_backfill.py`. See [plotting contracts](04_report_campaign/PLOTTING.md).

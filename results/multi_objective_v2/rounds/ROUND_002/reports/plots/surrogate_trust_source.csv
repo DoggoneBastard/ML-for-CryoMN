@@ -1,0 +1,6 @@
+panel,candidate_id,round_id,prediction,observed,uncertainty_std,absolute_error,nominal_coverage,empirical_coverage,interval_width,coverage_lower,coverage_upper,binary_outcome,signed_error
+coverage,,FORMAL_COHORT,,,,,0.5,,,,,,
+coverage,,FORMAL_COHORT,,,,,0.68,,,,,,
+coverage,,FORMAL_COHORT,,,,,0.8,,,,,,
+coverage,,FORMAL_COHORT,,,,,0.9,,,,,,
+coverage,,FORMAL_COHORT,,,,,0.95,,,,,,

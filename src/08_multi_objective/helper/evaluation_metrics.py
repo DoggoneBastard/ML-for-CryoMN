@@ -1026,20 +1026,24 @@ def compute_fixed_reference_hypervolume(
         frontier = frontier.loc[frontier["is_pareto"].astype(bool)]
     frontier[x_col] = pd.to_numeric(frontier.get(x_col), errors="coerce")
     frontier[y_col] = pd.to_numeric(frontier.get(y_col), errors="coerce")
-    frontier = frontier.dropna(subset=[x_col, y_col])
+    frontier = frontier.replace([np.inf, -np.inf], np.nan).dropna(subset=[x_col, y_col])
+    has_valid_evidence = not frontier.empty
     frontier = frontier.loc[
         frontier[x_col].gt(reference_x) & frontier[y_col].gt(reference_y)
     ]
     if frontier.empty:
         return {
-            "status": "not_estimable",
-            "hypervolume": np.nan,
+            "status": "estimated" if has_valid_evidence else "not_estimable",
+            "hypervolume": 0.0 if has_valid_evidence else np.nan,
             "unit": "percent_x_N_per_needle",
             "feasible_pair_count": evidence_count,
             "pareto_point_count": 0,
             "reference_viability_percent": reference_x,
             "reference_critical_axial_load_N_per_needle": reference_y,
-            "reason": "No feasible paired objective measurements exceed the fixed reference point.",
+            "reason": (
+                "Valid paired measurements contribute zero area beyond the fixed reference point."
+                if has_valid_evidence else "No valid feasible paired objective measurements."
+            ),
         }
 
     frontier = compute_observed_pareto_front(frontier, x_col=x_col, y_col=y_col)
@@ -1122,3 +1126,41 @@ def compute_campaign_hypervolume_progress(
         if current is not None:
             previous_hypervolume = current
     return pd.DataFrame(rows, columns=columns)
+
+
+def endpoint_r2_history(formulations, observations, metrics, registry):
+    """Existing cumulative paired CV calculation, extracted unchanged for rendering."""
+    if metrics.empty:
+        return pd.DataFrame(columns=["batch_id", "viability_r2", "load_r2"])
+    rounds = metrics["batch_id"].tolist()
+    rows = []
+    for round_id in rounds:
+        cumulative_obs = observations.loc[observations["batch_id"].map(_round_sort_key) <= _round_sort_key(round_id)].copy()
+        cumulative_frame = build_training_frame(formulations, cumulative_obs, registry)
+        paired_keys = cumulative_frame.dropna(subset=["viability_percent", "critical_axial_load_N_per_needle"])[["formulation_id", "batch_id"]]
+        if paired_keys.empty:
+            rows.append({"batch_id": round_id, "viability_r2": np.nan, "load_r2": np.nan})
+            continue
+        allowed = set((str(row.formulation_id), str(row.batch_id)) for row in paired_keys.itertuples())
+        filtered_obs = cumulative_obs.loc[
+            cumulative_obs.apply(lambda row: (str(row.get("formulation_id", "")), str(row.get("batch_id", ""))) in allowed, axis=1)
+        ].copy()
+        viability_predictions = _cross_validated_predictions(formulations, filtered_obs, registry, "viability_percent")
+        load_predictions = _cross_validated_predictions(
+            formulations,
+            filtered_obs,
+            registry,
+            "critical_axial_load_N_per_needle",
+        )
+        viability_r2 = (
+            float(r2_score(viability_predictions["actual"], viability_predictions["predicted"]))
+            if len(viability_predictions) >= 2 and np.nanstd(viability_predictions["actual"]) > 0
+            else np.nan
+        )
+        load_r2 = (
+            float(r2_score(load_predictions["actual"], load_predictions["predicted"]))
+            if len(load_predictions) >= 2 and np.nanstd(load_predictions["actual"]) > 0
+            else np.nan
+        )
+        rows.append({"batch_id": round_id, "viability_r2": viability_r2, "load_r2": load_r2})
+    return pd.DataFrame(rows, columns=["batch_id", "viability_r2", "load_r2"])

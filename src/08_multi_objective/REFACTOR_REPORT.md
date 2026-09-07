@@ -125,32 +125,9 @@ When paired mechanical evidence is absent, these functions return
 value of zero. IGD is omitted from the new scientific table because no true
 reference frontier is known.
 
-### Documentation and visualization prototypes
+### Documentation
 
-`ARCHITECTURE.md` explains the two objectives, feasibility gate, current lack of
-mechanical evidence, round lifecycle, important paths, modification points,
-immutable artifacts, legacy boundary, and common recovery cases.
-
-`04_report_campaign/prototype_visualizations.py` generates five review-only
-concepts. Every concept has a 300-dpi PNG, vector PDF, tidy source CSV, metadata
-JSON, and plain-language caption. The concepts are not imported by production
-reporting.
-
-- Concept A is a layout-only feasible Pareto map. Its mechanics values are
-  deterministic seed-42 demo data, it is watermarked, and its metadata excludes
-  it from scientific metrics.
-- Concept B is the recommended current campaign view because it uses real V2
-  evidence while showing that completed mechanical measurements equal zero.
-- Concept C is the recommended model-diagnostic view. Formal frozen prospective
-  viability evidence is primary; grouped cross-validation is secondary.
-- Concept D is the operator view. Unknown public viability predictions have no
-  numeric plotted position, and the displayed gate evidence is the active
-  empirical ingredient-combination probability.
-- Concept E is the recommended mature-campaign manuscript layout. Its Pareto
-  and hypervolume portions remain explicitly unavailable until mechanics data
-  exist.
-
-No concept was selected for production integration.
+Workflow documentation was added during the refactor. Visualization prototypes have subsequently been replaced by the selected production suite; see `04_report_campaign/PLOTTING.md`.
 
 ## 3. Direct mapping to the problems in Section 4
 
@@ -201,11 +178,6 @@ machine-specific absolute paths to repository-relative POSIX paths. All
 scientific and identifier columns match. The canonical observation table and
 completed archives were not migrated.
 
-### Intended prototype-only additions
-
-The five concept directories and comparison sheet are new review artifacts.
-Concept A alone contains synthetic layout data; this is declared in the image,
-caption, filename context, tidy-table status, and metadata.
 
 ### Unexplained differences
 
