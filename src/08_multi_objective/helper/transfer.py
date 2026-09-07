@@ -8,6 +8,7 @@ from typing import Mapping
 import pandas as pd
 
 from .config import nested_get
+from .paths import portable_source_path
 from .penalties import count_active_ingredients
 from .registry import IngredientRegistry
 
@@ -129,7 +130,7 @@ def build_v2_tables_from_legacy(
                     "unit": "percent",
                     "observation_noise": literature_noise,
                     "source_type": "legacy_literature",
-                    "source_file": str(literature_path),
+                    "source_file": portable_source_path(literature_path),
                     "notes": "Transferred from previous viability-only project.",
                 }
             )
@@ -159,7 +160,7 @@ def build_v2_tables_from_legacy(
                     "unit": "percent",
                     "observation_noise": wetlab_noise,
                     "source_type": "legacy_wetlab",
-                    "source_file": str(validation_path),
+                    "source_file": portable_source_path(validation_path),
                     "notes": "Transferred from previous wet-lab validation as viability-only evidence.",
                 }
             )

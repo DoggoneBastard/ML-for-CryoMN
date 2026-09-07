@@ -4,6 +4,9 @@ This lane is intentionally separated from the legacy viability-only pipeline.
 Only numbered directories contain executable workflow stages. Non-executable
 implementation code lives in `helper/`.
 
+For a plain-language map of the data, model, selection, validation, and report
+modules, see [V2 Architecture](ARCHITECTURE.md).
+
 ## Main Database
 
 The selector reads the v2 database from:
@@ -395,7 +398,7 @@ Stage 02 writes:
 - `results/multi_objective_v2/rounds/ROUND_###/proposal/summary.txt`
 - `results/multi_objective_v2/rounds/ROUND_###/proposal/selection_metadata.json`
   when metadata is available
-- `results/multi_objective_v2/rounds/ROUND_###/proposal/plots/next_round_candidate_screen.png`
+- `results/multi_objective_v2/rounds/ROUND_###/proposal/plots/candidate_decisions.png`
 
 `total_candidate_pool.csv` is the full generated/scored pool after temporary
 availability filtering. It includes model predictions, penalties, selection
@@ -435,7 +438,7 @@ results/multi_objective_v2/rounds/ROUND_###/
 └── reports/      # Reports generated from the database after this round's ingest
 ```
 
-Do not edit files under `rounds/`. Stage 03 validates the working worksheet
+Do not edit frozen inputs under `rounds/`. The reporting-only backfill may replace supported plot exports from archived evidence. Stage 03 validates the working worksheet
 against `proposal/proposal.csv`: result, replicate and note fields may change;
 candidate identity, chemistry, predictions, uncertainties, ranks and selection
 diagnostics may not. Row reordering and duplicated rows for technical
@@ -446,7 +449,7 @@ cumulative campaign reports. Proposal-time prospective reports are stored
 under `reports/prospective/`. The top-level `total_candidate_pool.csv` is a
 mutable full debug pool and is overwritten on each selection run.
 
-`model_evaluation_overview.png` and
+`diagnostics_1.png` and
 `model_evaluation_table.csv` are formulation-grouped cross-validation
 diagnostics: all batches of one chemistry remain in the same fold. They fit
 from the database contents and estimate within-dataset generalization. They are
@@ -566,3 +569,5 @@ flowchart TD
     G --> J["Cumulative prospective report<br/>reports/prospective/"]
     G --> B
 ```
+
+See [production plotting](04_report_campaign/PLOTTING.md) for the selected suite, transparent PNG exports and historical backfill.

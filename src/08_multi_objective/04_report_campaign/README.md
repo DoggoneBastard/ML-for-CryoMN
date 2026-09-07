@@ -59,3 +59,7 @@ outputs are written below
 During a normal experimental iteration, do not call this script separately.
 Stage 03 generates the completed round report and cumulative report before it
 creates the next proposal. Use this CLI only to refresh or backfill reports.
+
+## Selected plotting suite
+
+See [plotting documentation](PLOTTING.md) for A/B1/C3/D, the two diagnostic sheets, optional E, transparent PNG exports, and safe rendering-only backfill.

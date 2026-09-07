@@ -1,0 +1,484 @@
+{
+  "policy": "render archived evidence only; never refit historical models",
+  "records": [
+    {
+      "destination": "rounds/ROUND_001/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_001/reports/tables/prospective_evaluation_table.csv": "c5e2fd42b7d5874f48421d1199ec6afbb292a8869476a166791455582d655f55",
+        "rounds/ROUND_001/reports/tables/prospective_metrics.csv": "0ff4146232dcdf05a9d63b33995016fdde95fb9f1c9063d17fe35caa0f171eb5"
+      },
+      "generated": [
+        "rounds/ROUND_001/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_001/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_001/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_001/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_001/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_001/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_001/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_001/reports/tables/prospective_evaluation_table.csv": "c5e2fd42b7d5874f48421d1199ec6afbb292a8869476a166791455582d655f55"
+      },
+      "generated": [
+        "rounds/ROUND_001/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_001/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_001/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_002/proposal/plots",
+      "status": "skipped",
+      "reason": "Frozen proposal lacks active empirical probability or mechanical assignments; old plot preserved."
+    },
+    {
+      "destination": "rounds/ROUND_002/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_002/reports/tables/prospective_evaluation_table.csv": "0adf732decbde56170b4d70015574bb590dbd4f9e8290a066b70238f7465b483",
+        "rounds/ROUND_002/reports/tables/prospective_metrics.csv": "aee55f0bcbbb53e49d1e6fa1980092fc34f86766dc5defbef28b850115902bd3"
+      },
+      "generated": [
+        "rounds/ROUND_002/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_002/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_002/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_002/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_002/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_002/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_002/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_002/reports/tables/prospective_evaluation_table.csv": "0adf732decbde56170b4d70015574bb590dbd4f9e8290a066b70238f7465b483"
+      },
+      "generated": [
+        "rounds/ROUND_002/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_002/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_002/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_002/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_002/reports/plots/diagnostics_1_source.csv": "a7fb1ed500790261c4b628b1639b6223bdd99400df6f89eb00d1ec90e5700f23"
+      },
+      "generated": [
+        "rounds/ROUND_002/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_002/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_002/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_002/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_003/proposal/plots",
+      "status": "skipped",
+      "reason": "Frozen proposal lacks active empirical probability or mechanical assignments; old plot preserved."
+    },
+    {
+      "destination": "rounds/ROUND_003/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_003/reports/tables/prospective_evaluation_table.csv": "3bf45dd2481db927a615e67a94e1252ba21dee9c0e97b7b6dae45cf533db480e",
+        "rounds/ROUND_003/reports/tables/prospective_metrics.csv": "0cba7fd572f0a6b830d1a4e177217f7e1e6744b0fc9a699f981e70abec7a46a4"
+      },
+      "generated": [
+        "rounds/ROUND_003/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_003/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_003/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_003/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_003/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_003/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_003/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_003/reports/tables/prospective_evaluation_table.csv": "3bf45dd2481db927a615e67a94e1252ba21dee9c0e97b7b6dae45cf533db480e"
+      },
+      "generated": [
+        "rounds/ROUND_003/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_003/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_003/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_003/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_003/reports/plots/diagnostics_1_source.csv": "27f8f518fd393aa764d510c633e3d70e7aada09ff3b0d9dd950b2afb3fa73f72"
+      },
+      "generated": [
+        "rounds/ROUND_003/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_003/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_003/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_003/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_004/proposal/plots",
+      "status": "skipped",
+      "reason": "Frozen proposal lacks active empirical probability or mechanical assignments; old plot preserved."
+    },
+    {
+      "destination": "rounds/ROUND_004/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_004/reports/tables/prospective_evaluation_table.csv": "d045e4d4dbe890bc3668e64585e956163f149c10483c6418d3cf53d8e098c2c1",
+        "rounds/ROUND_004/reports/tables/prospective_metrics.csv": "82673ce96b89a243ede2dbb6e7fc3ceb9ee1e55a402b385066dbcf817e54b9fa"
+      },
+      "generated": [
+        "rounds/ROUND_004/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_004/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_004/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_004/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_004/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_004/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_004/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_004/reports/tables/prospective_evaluation_table.csv": "d045e4d4dbe890bc3668e64585e956163f149c10483c6418d3cf53d8e098c2c1"
+      },
+      "generated": [
+        "rounds/ROUND_004/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_004/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_004/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_004/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_004/reports/plots/diagnostics_1_source.csv": "c80d0c7aef3a84f4e26766531b6b26c5aa4f47d0e4e1ceb7c06c0d43ea055f77"
+      },
+      "generated": [
+        "rounds/ROUND_004/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_004/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_004/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_004/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_005/proposal/plots",
+      "status": "skipped",
+      "reason": "Frozen proposal lacks active empirical probability or mechanical assignments; old plot preserved."
+    },
+    {
+      "destination": "rounds/ROUND_005/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_005/reports/tables/prospective_evaluation_table.csv": "3ed24dbb093b94fb14b3edc740a8b03932b56aea4239137ed4c35d0526326ebe",
+        "rounds/ROUND_005/reports/tables/prospective_metrics.csv": "b930e39cc4370f5180aa00f5ea3f561bc2bbbf7acc9ef7f9ba0e8e0f16dfc8af"
+      },
+      "generated": [
+        "rounds/ROUND_005/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_005/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_005/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_005/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_005/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_005/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_005/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_005/reports/tables/prospective_evaluation_table.csv": "3ed24dbb093b94fb14b3edc740a8b03932b56aea4239137ed4c35d0526326ebe"
+      },
+      "generated": [
+        "rounds/ROUND_005/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_005/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_005/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_005/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_005/reports/plots/diagnostics_1_source.csv": "a378626526982c0c22862dacef9beb62f4ccab9e166e57dfbebf62a919377e65"
+      },
+      "generated": [
+        "rounds/ROUND_005/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_005/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_005/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_005/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_006/proposal/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_006/proposal/proposal.csv": "0d95d8abde6178e483ace84f6156fe7f5201e0326d2b4928a05c2a38a956893f"
+      },
+      "generated": [
+        "rounds/ROUND_006/proposal/plots/candidate_decisions.png",
+        "rounds/ROUND_006/proposal/plots/candidate_decisions_source.csv",
+        "rounds/ROUND_006/proposal/plots/candidate_decisions_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_006/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_006/reports/tables/prospective_evaluation_table.csv": "661dce88981d568d1ef82ec4e0f130971cb0e725627119b3a7e8d352dcc798ec",
+        "rounds/ROUND_006/reports/tables/prospective_metrics.csv": "1b712e95542ff8e794ef984a3f2333a236fe045de4eebef6e9909b181faa5d39"
+      },
+      "generated": [
+        "rounds/ROUND_006/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_006/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_006/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_006/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_006/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_006/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_006/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_006/reports/tables/prospective_evaluation_table.csv": "661dce88981d568d1ef82ec4e0f130971cb0e725627119b3a7e8d352dcc798ec"
+      },
+      "generated": [
+        "rounds/ROUND_006/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_006/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_006/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_006/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_006/reports/plots/diagnostics_1_source.csv": "a51f86d1d40a0f4f462a5f608ce798de73dbea1390fc7d0bf4b97d024b378202"
+      },
+      "generated": [
+        "rounds/ROUND_006/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_006/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_006/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_006/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_007/proposal/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_007/proposal/proposal.csv": "12f70a40ce417cd6a0ae5d24238821077c69f26a1ce7368e5af7999d2f412a7e"
+      },
+      "generated": [
+        "rounds/ROUND_007/proposal/plots/candidate_decisions.png",
+        "rounds/ROUND_007/proposal/plots/candidate_decisions_source.csv",
+        "rounds/ROUND_007/proposal/plots/candidate_decisions_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_007/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_007/reports/tables/prospective_evaluation_table.csv": "6ad0c6d68b5c20aa394f273fcd217bb856283840c893c2f330db5e2dc0b8dca7",
+        "rounds/ROUND_007/reports/tables/prospective_metrics.csv": "f070b01d662d2afcce09cdb34879049d13f150f62309b1db1fd6fd4e90a9fe79"
+      },
+      "generated": [
+        "rounds/ROUND_007/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_007/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_007/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_007/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_007/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_007/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_007/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_007/reports/tables/prospective_evaluation_table.csv": "6ad0c6d68b5c20aa394f273fcd217bb856283840c893c2f330db5e2dc0b8dca7"
+      },
+      "generated": [
+        "rounds/ROUND_007/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_007/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_007/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_007/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_007/reports/plots/diagnostics_1_source.csv": "87a8de4d5994eda4ae64db9290ca1328004ebcf4814f637063ed31a901f62c86"
+      },
+      "generated": [
+        "rounds/ROUND_007/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_007/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_007/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_007/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_008/proposal/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_008/proposal/proposal.csv": "ce6c5e5f7d6e75e45183ff2d4d7ba540d0ca544451553136475258fa08da1c10"
+      },
+      "generated": [
+        "rounds/ROUND_008/proposal/plots/candidate_decisions.png",
+        "rounds/ROUND_008/proposal/plots/candidate_decisions_source.csv",
+        "rounds/ROUND_008/proposal/plots/candidate_decisions_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_008/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_008/reports/tables/prospective_evaluation_table.csv": "06de9d0efcddd964f1b2ff4aa2c3304180f8d4d487905e3b978d74ea2c341294",
+        "rounds/ROUND_008/reports/tables/prospective_metrics.csv": "ab010aa86fae49ce5a82695b0b053da510cf06685bfd753cf5f0f2b6148e6f28"
+      },
+      "generated": [
+        "rounds/ROUND_008/reports/plots/campaign_timeline.png",
+        "rounds/ROUND_008/reports/plots/campaign_timeline_source.csv",
+        "rounds/ROUND_008/reports/plots/campaign_timeline_metadata.json",
+        "rounds/ROUND_008/reports/plots/surrogate_trust.png",
+        "rounds/ROUND_008/reports/plots/surrogate_trust_source.csv",
+        "rounds/ROUND_008/reports/plots/surrogate_trust_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_008/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_008/reports/tables/prospective_evaluation_table.csv": "06de9d0efcddd964f1b2ff4aa2c3304180f8d4d487905e3b978d74ea2c341294"
+      },
+      "generated": [
+        "rounds/ROUND_008/reports/plots/observed_tradeoff.png",
+        "rounds/ROUND_008/reports/plots/observed_tradeoff_source.csv",
+        "rounds/ROUND_008/reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_008/reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_008/reports/plots/diagnostics_1_source.csv": "0761216b71642ee037b35229de5698a1bd6c16411052da91b82ccb8ab02543e4"
+      },
+      "generated": [
+        "rounds/ROUND_008/reports/plots/diagnostics_1.png",
+        "rounds/ROUND_008/reports/plots/diagnostics_1_source.csv",
+        "rounds/ROUND_008/reports/plots/diagnostics_1_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_008/reports/plots/diagnostics_2.png",
+      "status": "skipped",
+      "reason": "No archived paired CV/history tables; no historical models refitted."
+    },
+    {
+      "destination": "rounds/ROUND_009/proposal/plots",
+      "status": "refreshed",
+      "sources": {
+        "rounds/ROUND_009/proposal/proposal.csv": "658fd5fd00414e2c373d90e5f05bf4a8897458ebf8c14002ab15818f34f06132"
+      },
+      "generated": [
+        "rounds/ROUND_009/proposal/plots/candidate_decisions.png",
+        "rounds/ROUND_009/proposal/plots/candidate_decisions_source.csv",
+        "rounds/ROUND_009/proposal/plots/candidate_decisions_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "rounds/ROUND_009/reports",
+      "status": "skipped",
+      "reason": "No stored prospective table and metrics; historical reports preserved."
+    },
+    {
+      "destination": "reports/prospective/plots",
+      "status": "refreshed",
+      "sources": {
+        "reports/prospective/tables/prospective_evaluation_table.csv": "6ecd0374d877f221da909399b799ea8abb91068d0290a256a06a44bd41cca645",
+        "reports/prospective/tables/prospective_metrics.csv": "9383c374d9f21c38d6ee7f20168d1afeade449f82dbdfe34a3c45d37f756fb09",
+        "next_round/next_round_candidates.csv": "658fd5fd00414e2c373d90e5f05bf4a8897458ebf8c14002ab15818f34f06132"
+      },
+      "generated": [
+        "reports/prospective/plots/campaign_timeline.png",
+        "reports/prospective/plots/campaign_timeline_source.csv",
+        "reports/prospective/plots/campaign_timeline_metadata.json",
+        "reports/prospective/plots/surrogate_trust.png",
+        "reports/prospective/plots/surrogate_trust_source.csv",
+        "reports/prospective/plots/surrogate_trust_metadata.json",
+        "reports/prospective/plots/publication_summary.png",
+        "reports/prospective/plots/publication_summary_source.csv",
+        "reports/prospective/plots/publication_summary_metadata.json"
+      ],
+      "removed": []
+    },
+    {
+      "destination": "reports/plots",
+      "status": "refreshed",
+      "sources": {
+        "reports/prospective/tables/prospective_evaluation_table.csv": "6ecd0374d877f221da909399b799ea8abb91068d0290a256a06a44bd41cca645",
+        "reports/prospective/tables/prospective_metrics.csv": "9383c374d9f21c38d6ee7f20168d1afeade449f82dbdfe34a3c45d37f756fb09",
+        "next_round/next_round_candidates.csv": "658fd5fd00414e2c373d90e5f05bf4a8897458ebf8c14002ab15818f34f06132"
+      },
+      "generated": [
+        "reports/plots/observed_tradeoff.png",
+        "reports/plots/observed_tradeoff_source.csv",
+        "reports/plots/observed_tradeoff_metadata.json"
+      ],
+      "removed": []
+    }
+  ]
+}

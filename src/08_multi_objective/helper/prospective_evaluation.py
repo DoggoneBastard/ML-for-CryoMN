@@ -28,6 +28,36 @@ from .endpoints import INTACT_PATCH_ENDPOINT, aggregate_intact_patch_replicates
 from .paths import RESULTS_V2_DIR
 
 
+from .evaluation_metrics import (
+    _active_phase,
+    _aggregate_completed_candidates,
+    _boolean_numeric,
+    _build_model_evaluation_frames,
+    _campaign_and_literature_observed,
+    _cross_validated_predictions,
+    _hypervolume_2d,
+    _igd_2d,
+    _is_blank,
+    _metric_row,
+    _normalize_frame,
+    _numeric,
+    _observed_endpoint_frame,
+    _paired_frame,
+    _pareto_frontier_mask,
+    _proposal_path,
+    _proposal_prediction_value,
+    _provenance,
+    _replicate_count,
+    _round_metrics,
+    _round_number,
+    _round_sort_key,
+    build_round_prospective_table,
+    summarize_prospective_metrics,
+)
+
+from .plot_reporting import write_prospective
+
+
 PAGE_BG = "#f7f2e8"
 AX_BG = "#fffdf8"
 GRID = "#d8d0c1"
@@ -95,46 +125,12 @@ METRIC_COLUMNS = [
 ]
 
 
-def _apply_style() -> None:
-    plt.rcParams.update(
-        {
-            "font.size": 10.5,
-            "axes.titlesize": 13,
-            "axes.labelsize": 11,
-            "axes.facecolor": AX_BG,
-            "axes.edgecolor": GRID,
-            "axes.labelcolor": TEXT,
-            "xtick.color": TEXT,
-            "ytick.color": TEXT,
-            "text.color": TEXT,
-            "figure.facecolor": PAGE_BG,
-            "savefig.facecolor": PAGE_BG,
-            "grid.color": GRID,
-            "grid.alpha": 0.8,
-            "axes.grid": True,
-            "axes.axisbelow": True,
-        }
-    )
 
 
-def _is_blank(value: object) -> bool:
-    return value is None or pd.isna(value) or str(value).strip() == ""
 
 
-def _numeric(value: object) -> float | None:
-    if _is_blank(value):
-        return None
-    parsed = pd.to_numeric(value, errors="coerce")
-    if pd.isna(parsed):
-        return None
-    return float(parsed)
 
 
-def _round_number(batch_id: str) -> int | None:
-    value = str(batch_id).strip()
-    if value.startswith("ROUND_") and value.removeprefix("ROUND_").isdigit():
-        return int(value.removeprefix("ROUND_"))
-    return None
 
 
 def _round_sort_key(batch_id: object) -> tuple[int, str]:
@@ -144,579 +140,28 @@ def _round_sort_key(batch_id: object) -> tuple[int, str]:
     return (1, str(batch_id))
 
 
-def _proposal_path(batch_id: str, results_root: str | Path) -> Path:
-    paths = round_artifact_paths(batch_id, results_root)
-    if paths.proposal_csv.exists():
-        return paths.proposal_csv
-    reconstructed = paths.proposal_dir / "proposal_reconstructed.csv"
-    if reconstructed.exists():
-        return reconstructed
-    raise FileNotFoundError(f"No archived proposal exists for {batch_id}: {paths.proposal_dir}")
 
 
-def _active_phase(batch_id: str, results_root: str | Path) -> str:
-    metadata_path = round_artifact_paths(batch_id, results_root).proposal_metadata
-    if metadata_path.exists():
-        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        value = str(metadata.get("active_phase", "")).strip()
-        if value:
-            return value
-    return "screening_only"
 
 
-def _provenance(
-    batch_id: str,
-    evaluation_config: Mapping[str, Any],
-) -> tuple[str, bool]:
-    provenance_config = evaluation_config.get("round_provenance", {})
-    provenance = str(
-        provenance_config.get(
-            batch_id,
-            provenance_config.get("default", "formal_frozen"),
-        )
-    )
-    number = _round_number(batch_id)
-    formal_start = int(evaluation_config.get("formal_start_round", 3))
-    formal = (
-        provenance == "formal_frozen"
-        and number is not None
-        and number >= formal_start
-    )
-    return provenance, formal
 
 
-def _replicate_count(frame: pd.DataFrame) -> int:
-    if frame.empty:
-        return 0
-    if "replicate_id" in frame.columns:
-        values = frame["replicate_id"].dropna().astype(str).str.strip()
-        values = values[values != ""]
-        if not values.empty:
-            return int(values.nunique())
-    return int(len(frame))
 
 
-def _proposal_prediction_value(
-    proposal_row: pd.Series,
-    definition: Mapping[str, Any],
-    primary_key: str,
-    fallback_key: str,
-) -> float | None:
-    """Read a frozen prediction with backward compatibility for old rounds."""
-    primary_column = str(definition.get(primary_key, "")).strip()
-    if primary_column:
-        value = _numeric(proposal_row.get(primary_column))
-        if value is not None:
-            return value
-    for column in definition.get(fallback_key, []) or []:
-        value = _numeric(proposal_row.get(str(column)))
-        if value is not None:
-            return value
-    return None
 
 
-def build_round_prospective_table(
-    batch_id: str,
-    observations: pd.DataFrame,
-    results_root: str | Path = RESULTS_V2_DIR,
-    evaluation_config: Mapping[str, Any] | None = None,
-) -> pd.DataFrame:
-    """Build one candidate-by-endpoint table from frozen proposal predictions."""
-    evaluation_config = dict(evaluation_config or {})
-    results_root = Path(results_root)
-    paths = round_artifact_paths(batch_id, results_root)
-    proposal_path = _proposal_path(batch_id, results_root)
-    if not paths.completed_csv.exists():
-        raise FileNotFoundError(
-            f"Completed worksheet does not exist for {batch_id}: {paths.completed_csv}"
-        )
-    validate_completed_against_proposal(paths.completed_csv, proposal_path)
-
-    proposal = pd.read_csv(proposal_path)
-    completed = pd.read_csv(paths.completed_csv)
-    observations = observations.copy()
-    if "batch_id" not in observations.columns:
-        observations["batch_id"] = ""
-    if "formulation_id" not in observations.columns:
-        observations["formulation_id"] = ""
-    if "endpoint" not in observations.columns:
-        observations["endpoint"] = ""
-    if "value" not in observations.columns:
-        observations["value"] = np.nan
-    round_observations = observations[
-        observations["batch_id"].astype(str) == str(batch_id)
-    ].copy()
-    round_observations["value"] = pd.to_numeric(
-        round_observations["value"],
-        errors="coerce",
-    )
-
-    provenance, formal_cohort = _provenance(batch_id, evaluation_config)
-    round_number = _round_number(batch_id)
-    active_phase = _active_phase(batch_id, results_root)
-    policy_version = str(
-        evaluation_config.get("policy_version", "prospective_evaluation_v2")
-    )
-    interval_z = float(
-        evaluation_config.get("prediction_interval", {}).get("z_value", 1.96)
-    )
-    endpoint_config = evaluation_config.get("endpoints", {})
-    duplicate_formulations = set(
-        proposal.loc[
-            proposal["formulation_id"].astype(str).duplicated(keep=False),
-            "formulation_id",
-        ].astype(str)
-    )
-    completed_counts = (
-        completed.assign(candidate_id=completed["candidate_id"].astype(str))
-        .groupby("candidate_id")
-        .size()
-        .to_dict()
-    )
-
-    rows: list[dict[str, object]] = []
-    for _, proposal_row in proposal.iterrows():
-        candidate_id = str(proposal_row["candidate_id"])
-        formulation_id = str(proposal_row["formulation_id"])
-        for endpoint, definition in endpoint_config.items():
-            prediction_mean = _proposal_prediction_value(
-                proposal_row,
-                definition,
-                "prediction_mean_column",
-                "prediction_mean_fallback_columns",
-            )
-            prediction_std = _proposal_prediction_value(
-                proposal_row,
-                definition,
-                "prediction_std_column",
-                "prediction_std_fallback_columns",
-            )
-            endpoint_observations = round_observations[
-                (round_observations["formulation_id"].astype(str) == formulation_id)
-                & (round_observations["endpoint"].astype(str) == str(endpoint))
-            ].dropna(subset=["value"])
-            if endpoint_observations.empty:
-                observed_mean = None
-            elif str(endpoint) == INTACT_PATCH_ENDPOINT:
-                observed_mean = aggregate_intact_patch_replicates(
-                    endpoint_observations["value"]
-                )
-            else:
-                observed_mean = float(endpoint_observations["value"].mean())
-            unit = (
-                str(endpoint_observations.iloc[0].get("unit", ""))
-                if not endpoint_observations.empty
-                else ""
-            )
-
-            exclusion_reason = ""
-            if formulation_id in duplicate_formulations:
-                exclusion_reason = "ambiguous_duplicate_formulation"
-            elif prediction_mean is None:
-                exclusion_reason = "missing_frozen_prediction"
-            elif observed_mean is None:
-                exclusion_reason = "not_measured"
-            elif (
-                definition.get("formal_phase")
-                and str(definition.get("formal_phase")) != active_phase
-            ):
-                exclusion_reason = "endpoint_not_active"
-            evaluation_eligible = exclusion_reason == ""
-
-            formal_exclusion_reason = ""
-            if not evaluation_eligible:
-                formal_exclusion_reason = exclusion_reason
-            elif not formal_cohort:
-                formal_exclusion_reason = "outside_formal_cohort"
-            formal_metric_eligible = formal_exclusion_reason == ""
-
-            signed_error = None
-            absolute_error = None
-            squared_error = None
-            standardized_residual = None
-            interval_lower = None
-            interval_upper = None
-            interval_covered = None
-            brier_score = None
-            classification_correct = None
-            metric_type = str(definition.get("metric_type", "continuous"))
-            if evaluation_eligible and prediction_mean is not None and observed_mean is not None:
-                signed_error = prediction_mean - observed_mean
-                absolute_error = abs(signed_error)
-                squared_error = signed_error**2
-                if prediction_std is not None and prediction_std > 0:
-                    standardized_residual = signed_error / prediction_std
-                    interval_lower = prediction_mean - interval_z * prediction_std
-                    interval_upper = prediction_mean + interval_z * prediction_std
-                    interval_covered = bool(
-                        interval_lower <= observed_mean <= interval_upper
-                    )
-                if metric_type == "binary":
-                    brier_score = squared_error
-                    threshold = float(definition.get("classification_threshold", 0.5))
-                    classification_correct = bool(
-                        (prediction_mean >= threshold) == (observed_mean >= threshold)
-                    )
-
-            rows.append(
-                {
-                    "evaluation_policy_version": policy_version,
-                    "round_id": batch_id,
-                    "round_number": round_number,
-                    "provenance_class": provenance,
-                    "formal_cohort": formal_cohort,
-                    "active_phase": active_phase,
-                    "candidate_id": candidate_id,
-                    "formulation_id": formulation_id,
-                    "recommendation_type": proposal_row.get("recommendation_type", ""),
-                    "selection_rank": proposal_row.get("selection_rank", ""),
-                    "endpoint": endpoint,
-                    "endpoint_role": definition.get("role", ""),
-                    "metric_type": metric_type,
-                    "prediction_mean": prediction_mean,
-                    "prediction_std": prediction_std,
-                    "observed_mean": observed_mean,
-                    "observed_unit": unit,
-                    "replicate_count": _replicate_count(endpoint_observations),
-                    "completed_row_count": int(completed_counts.get(candidate_id, 0)),
-                    "evaluation_eligible": evaluation_eligible,
-                    "exclusion_reason": exclusion_reason,
-                    "formal_metric_eligible": formal_metric_eligible,
-                    "formal_exclusion_reason": formal_exclusion_reason,
-                    "signed_error": signed_error,
-                    "absolute_error": absolute_error,
-                    "squared_error": squared_error,
-                    "standardized_residual": standardized_residual,
-                    "interval_95_lower": interval_lower,
-                    "interval_95_upper": interval_upper,
-                    "interval_95_covered": interval_covered,
-                    "brier_score": brier_score,
-                    "classification_correct": classification_correct,
-                }
-            )
-    return pd.DataFrame(rows, columns=PROSPECTIVE_TABLE_COLUMNS)
 
 
-def _metric_row(
-    frame: pd.DataFrame,
-    scope: str,
-    round_id: str,
-    provenance_class: str,
-    formal_cohort: bool,
-    eligible_column: str,
-) -> dict[str, object]:
-    endpoint = str(frame.iloc[0]["endpoint"])
-    endpoint_role = str(frame.iloc[0]["endpoint_role"])
-    eligible = frame[frame[eligible_column].astype(bool)].copy()
-    actual = pd.to_numeric(eligible["observed_mean"], errors="coerce")
-    predicted = pd.to_numeric(eligible["prediction_mean"], errors="coerce")
-    valid = actual.notna() & predicted.notna()
-    actual = actual[valid]
-    predicted = predicted[valid]
-    n_evaluated = int(len(actual))
-    n_proposed = int(len(frame))
-
-    mae = rmse = bias = r2 = coverage = mean_width = median_width = brier = accuracy = np.nan
-    if n_evaluated:
-        errors = predicted.to_numpy(dtype=float) - actual.to_numpy(dtype=float)
-        metric_type = str(frame.iloc[0]["metric_type"])
-        if metric_type == "continuous":
-            mae = float(np.mean(np.abs(errors)))
-            rmse = float(np.sqrt(np.mean(errors**2)))
-            bias = float(np.mean(errors))
-            if n_evaluated >= 2 and float(np.var(actual.to_numpy(dtype=float))) > 0:
-                denominator = float(
-                    np.sum((actual.to_numpy(dtype=float) - float(actual.mean())) ** 2)
-                )
-                r2 = float(1.0 - np.sum(errors**2) / denominator)
-            covered = eligible.loc[valid, "interval_95_covered"].dropna()
-            if not covered.empty:
-                coverage = float(covered.astype(bool).mean())
-            interval_lower = pd.to_numeric(
-                eligible.loc[valid, "interval_95_lower"],
-                errors="coerce",
-            )
-            interval_upper = pd.to_numeric(
-                eligible.loc[valid, "interval_95_upper"],
-                errors="coerce",
-            )
-            widths = (interval_upper - interval_lower).dropna()
-            if not widths.empty:
-                mean_width = float(widths.mean())
-                median_width = float(widths.median())
-        elif metric_type == "binary":
-            brier_values = pd.to_numeric(
-                eligible.loc[valid, "brier_score"],
-                errors="coerce",
-            ).dropna()
-            correct_values = eligible.loc[valid, "classification_correct"].dropna()
-            if not brier_values.empty:
-                brier = float(brier_values.mean())
-            if not correct_values.empty:
-                accuracy = float(correct_values.astype(bool).mean())
-
-    return {
-        "scope": scope,
-        "round_id": round_id,
-        "provenance_class": provenance_class,
-        "formal_cohort": formal_cohort,
-        "endpoint": endpoint,
-        "endpoint_role": endpoint_role,
-        "n_proposed": n_proposed,
-        "n_evaluated": n_evaluated,
-        "completion_rate": float(n_evaluated / n_proposed) if n_proposed else np.nan,
-        "mae": mae,
-        "rmse": rmse,
-        "bias": bias,
-        "r2": r2,
-        "interval_95_coverage": coverage,
-        "interval_95_mean_width": mean_width,
-        "interval_95_median_width": median_width,
-        "brier_score": brier,
-        "accuracy": accuracy,
-    }
 
 
-def summarize_prospective_metrics(table: pd.DataFrame) -> pd.DataFrame:
-    """Summarize each round and keep historical provenance cohorts distinct."""
-    if table.empty:
-        return pd.DataFrame(columns=METRIC_COLUMNS)
-    rows: list[dict[str, object]] = []
-    ordered = table.assign(
-        _round_sort=table["round_id"].map(_round_sort_key)
-    ).sort_values(["_round_sort", "endpoint"])
-    for (round_id, endpoint), frame in ordered.groupby(
-        ["round_id", "endpoint"],
-        sort=False,
-    ):
-        rows.append(
-            _metric_row(
-                frame,
-                scope="round",
-                round_id=str(round_id),
-                provenance_class=str(frame.iloc[0]["provenance_class"]),
-                formal_cohort=bool(frame.iloc[0]["formal_cohort"]),
-                eligible_column="evaluation_eligible",
-            )
-        )
-    for endpoint, frame in ordered.groupby("endpoint", sort=False):
-        rows.append(
-            _metric_row(
-                frame,
-                scope="pooled_all",
-                round_id="ALL_COMPLETED",
-                provenance_class="mixed",
-                formal_cohort=False,
-                eligible_column="evaluation_eligible",
-            )
-        )
-        for provenance_class, provenance_scope in [
-            ("reconstructed", "pooled_reconstructed"),
-            ("migration_frozen_supplementary", "pooled_supplementary"),
-            ("formal_frozen", "pooled_formal"),
-        ]:
-            provenance_frame = frame[
-                frame["provenance_class"].astype(str) == provenance_class
-            ]
-            if provenance_frame.empty:
-                rows.append(
-                    {
-                        "scope": provenance_scope,
-                        "round_id": (
-                            "FORMAL_COHORT"
-                            if provenance_scope == "pooled_formal"
-                            else provenance_class
-                        ),
-                        "provenance_class": provenance_class,
-                        "formal_cohort": provenance_scope == "pooled_formal",
-                        "endpoint": endpoint,
-                        "endpoint_role": str(frame.iloc[0]["endpoint_role"]),
-                        "n_proposed": 0,
-                        "n_evaluated": 0,
-                        "completion_rate": np.nan,
-                        "mae": np.nan,
-                        "rmse": np.nan,
-                        "bias": np.nan,
-                        "r2": np.nan,
-                        "interval_95_coverage": np.nan,
-                        "interval_95_mean_width": np.nan,
-                        "interval_95_median_width": np.nan,
-                        "brier_score": np.nan,
-                        "accuracy": np.nan,
-                    }
-                )
-                continue
-            rows.append(
-                _metric_row(
-                    provenance_frame,
-                    scope=provenance_scope,
-                    round_id=(
-                        "FORMAL_COHORT"
-                        if provenance_scope == "pooled_formal"
-                        else provenance_class
-                    ),
-                    provenance_class=provenance_class,
-                    formal_cohort=provenance_scope == "pooled_formal",
-                    eligible_column=(
-                        "formal_metric_eligible"
-                        if provenance_scope == "pooled_formal"
-                        else "evaluation_eligible"
-                    ),
-                )
-            )
-    return pd.DataFrame(rows, columns=METRIC_COLUMNS)
 
 
-def _placeholder_plot(path: Path, title: str, message: str) -> Path:
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.axis("off")
-    ax.set_title(title)
-    ax.text(0.5, 0.5, message, ha="center", va="center", color=MUTED)
-    fig.tight_layout()
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return path
 
 
-def _prediction_plot(table: pd.DataFrame, path: Path) -> Path:
-    continuous = table[
-        table["evaluation_eligible"].astype(bool)
-        & (table["metric_type"].astype(str) == "continuous")
-    ].copy()
-    endpoints = [
-        endpoint
-        for endpoint in [
-            "viability_percent",
-            "critical_axial_load_N_per_needle",
-        ]
-        if endpoint in set(continuous["endpoint"].astype(str))
-    ]
-    if not endpoints:
-        return _placeholder_plot(
-            path,
-            "Frozen predictions vs observed results",
-            "No eligible continuous prospective observations yet.",
-        )
-    fig, axes = plt.subplots(1, len(endpoints), figsize=(7 * len(endpoints), 5.5))
-    axes_array = np.atleast_1d(axes)
-    labels = {
-        "viability_percent": "Viability (%)",
-        "critical_axial_load_N_per_needle": "Critical load (N/needle)",
-    }
-    for ax, endpoint in zip(axes_array, endpoints):
-        frame = continuous[continuous["endpoint"].astype(str) == endpoint]
-        actual = pd.to_numeric(frame["observed_mean"], errors="coerce").to_numpy(dtype=float)
-        predicted = pd.to_numeric(frame["prediction_mean"], errors="coerce").to_numpy(dtype=float)
-        std = pd.to_numeric(frame["prediction_std"], errors="coerce").to_numpy(dtype=float)
-        valid_std = np.isfinite(std) & (std >= 0)
-        yerr = np.where(valid_std, 1.96 * std, 0.0)
-        colors = [TEAL if bool(value) else BLUE for value in frame["formal_cohort"]]
-        ax.errorbar(
-            actual,
-            predicted,
-            yerr=yerr,
-            fmt="none",
-            ecolor=GRID,
-            alpha=0.8,
-            capsize=3,
-        )
-        ax.scatter(
-            actual,
-            predicted,
-            s=70,
-            c=colors,
-            edgecolor="white",
-            linewidth=0.7,
-            alpha=0.9,
-        )
-        low = float(np.nanmin(np.concatenate([actual, predicted])))
-        high = float(np.nanmax(np.concatenate([actual, predicted])))
-        pad = max((high - low) * 0.08, 1e-6)
-        ax.plot([low - pad, high + pad], [low - pad, high + pad], "--", color=MUTED)
-        ax.set_xlim(low - pad, high + pad)
-        ax.set_ylim(low - pad, high + pad)
-        ax.set_xlabel(f"Observed {labels[endpoint]}")
-        ax.set_ylabel(f"Frozen prediction {labels[endpoint]}")
-        ax.set_title(labels[endpoint])
-    fig.suptitle("Proposal-time predictions vs observed results", fontsize=16)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return path
 
 
-def _gate_plot(table: pd.DataFrame, path: Path) -> Path:
-    frame = table[
-        table["evaluation_eligible"].astype(bool)
-        & (table["endpoint"].astype(str) == "intact_patch_formation_pass")
-    ].copy()
-    if frame.empty:
-        return _placeholder_plot(
-            path,
-            "Prospective intact-gate calibration",
-            "No eligible intact-gate observations yet.",
-        )
-    predicted = pd.to_numeric(frame["prediction_mean"], errors="coerce")
-    actual = pd.to_numeric(frame["observed_mean"], errors="coerce")
-    jitter = np.linspace(-0.06, 0.06, len(frame)) if len(frame) > 1 else np.array([0.0])
-    colors = [TEAL if bool(value) else BLUE for value in frame["formal_cohort"]]
-    fig, ax = plt.subplots(figsize=(8, 5.5))
-    ax.scatter(
-        predicted,
-        actual + jitter,
-        s=75,
-        c=colors,
-        edgecolor="white",
-        linewidth=0.7,
-        alpha=0.9,
-    )
-    ax.set_xlim(-0.03, 1.03)
-    ax.set_ylim(-0.25, 1.25)
-    ax.set_yticks([0, 1], labels=["Observed fail", "Observed pass"])
-    ax.set_xlabel("Frozen predicted intact-pass probability")
-    ax.set_title("Proposal-time intact-gate predictions")
-    fig.tight_layout()
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return path
 
 
-def _error_by_round_plot(metrics: pd.DataFrame, path: Path) -> Path:
-    frame = metrics[
-        (metrics["scope"].astype(str) == "round")
-        & (metrics["endpoint"].astype(str) == "viability_percent")
-        & pd.to_numeric(metrics["mae"], errors="coerce").notna()
-    ].copy()
-    if frame.empty:
-        return _placeholder_plot(
-            path,
-            "Prospective viability error by round",
-            "No round-level prospective viability metrics yet.",
-        )
-    frame["_sort"] = frame["round_id"].map(_round_sort_key)
-    frame = frame.sort_values("_sort")
-    x = np.arange(len(frame))
-    colors = [TEAL if bool(value) else BLUE for value in frame["formal_cohort"]]
-    fig, ax = plt.subplots(figsize=(9, 5.5))
-    ax.plot(x, frame["mae"], color=GRID, linewidth=2)
-    ax.scatter(x, frame["mae"], c=colors, s=90, edgecolor="white", linewidth=0.8)
-    ax.set_xticks(x, labels=frame["round_id"], rotation=30, ha="right")
-    ax.set_ylabel("Viability MAE (percentage points)")
-    ax.set_title("Frozen-prediction error by completed round")
-    for index, row in frame.reset_index(drop=True).iterrows():
-        ax.annotate(
-            str(row["provenance_class"]),
-            (index, float(row["mae"])),
-            xytext=(0, 8),
-            textcoords="offset points",
-            ha="center",
-            fontsize=8,
-            color=MUTED,
-        )
-    fig.tight_layout()
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-    return path
 
 
 def _format_metric(value: object, digits: int = 3) -> str:
@@ -848,7 +293,6 @@ def generate_round_prospective_artifacts(
     evaluation_config: Mapping[str, Any] | None = None,
 ) -> list[Path]:
     """Generate one completed round's proposal-time evaluation bundle."""
-    _apply_style()
     evaluation_config = dict(evaluation_config or {})
     results_root = Path(results_root)
     reports_dir = round_artifact_paths(batch_id, results_root).reports_dir
@@ -876,14 +320,8 @@ def generate_round_prospective_artifacts(
             _summary_text(table, metrics, evaluation_config, campaign=False),
             encoding="utf-8",
         )
-        _prediction_plot(
-            table,
-            staging / "plots" / "prospective_prediction_vs_observed.png",
-        )
-        _gate_plot(
-            table,
-            staging / "plots" / "prospective_gate_calibration.png",
-        )
+        round_observations=observations.loc[observations.batch_id.astype(str).eq(batch_id)]
+        write_prospective(round_observations,table,metrics,pd.DataFrame(),staging/'plots',f'{batch_id} only; frozen prospective evidence')
         return _promote_tree(staging, reports_dir)
 
 
@@ -903,9 +341,9 @@ def generate_campaign_prospective_artifacts(
     observations: pd.DataFrame,
     results_root: str | Path = RESULTS_V2_DIR,
     evaluation_config: Mapping[str, Any] | None = None,
+    *, include_publication_summary: bool = False,
 ) -> list[Path]:
     """Generate pooled reports over every completed round archive."""
-    _apply_style()
     evaluation_config = dict(evaluation_config or {})
     results_root = Path(results_root)
     output_dir = results_root / "reports" / "prospective"
@@ -938,12 +376,8 @@ def generate_campaign_prospective_artifacts(
             _summary_text(table, metrics, evaluation_config, campaign=True),
             encoding="utf-8",
         )
-        _prediction_plot(
-            table,
-            staging / "plots" / "prospective_prediction_vs_observed.png",
-        )
-        _error_by_round_plot(
-            metrics,
-            staging / "plots" / "prospective_error_by_round.png",
-        )
+        write_prospective(observations,table,metrics,pd.DataFrame(),staging/'plots','Cumulative campaign; frozen prospective evidence',
+                          include_publication_summary=include_publication_summary)
         return _promote_tree(staging, output_dir)
+
+

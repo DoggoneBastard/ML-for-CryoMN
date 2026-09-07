@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Regenerate every completed round before refreshing the campaign report.",
     )
+    parser.add_argument("--include-publication-summary", action="store_true", help="Also export the optional E publication PNG.")
+    parser.add_argument("--restyle-existing", action="store_true", help="Redraw stored evidence only; preserve unsupported historical figures.")
     parser.add_argument("--observations", default=str(OBSERVATIONS_PATH))
     parser.add_argument("--results-root", default=str(RESULTS_V2_DIR))
     parser.add_argument("--evaluation-config", default=str(EVALUATION_CONFIG))
@@ -54,6 +56,10 @@ def _completed_round_ids(results_root: Path) -> list[str]:
 
 def main() -> None:
     args = parse_args()
+    if args.restyle_existing:
+        from helper.plot_backfill import restyle_existing
+        print(restyle_existing(args.results_root,args.include_publication_summary,args.round_id))
+        return
     observations_path = Path(args.observations)
     results_root = Path(args.results_root)
     if not observations_path.exists():
@@ -87,6 +93,7 @@ def main() -> None:
 
     campaign_generated = generate_campaign_prospective_artifacts(
         observations,
+        include_publication_summary=args.include_publication_summary,
         results_root=results_root,
         evaluation_config=evaluation_config,
     )

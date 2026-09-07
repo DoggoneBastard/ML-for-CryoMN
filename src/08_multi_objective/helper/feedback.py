@@ -10,6 +10,7 @@ import pandas as pd
 
 from .endpoints import intact_patch_formation_pass, parse_bool
 from .instron import parse_instron_csv
+from .paths import portable_source_path
 from .penalties import count_active_ingredients
 from .registry import IngredientRegistry
 from .transfer import FORMULATION_BASE_COLUMNS, OBSERVATION_COLUMNS
@@ -178,7 +179,7 @@ def ingest_feedback(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Append one wet-lab feedback CSV into the v2 tables."""
     feedback_path = Path(feedback_path)
-    source_file = str(
+    source_file = portable_source_path(
         Path(observation_source_file)
         if observation_source_file is not None
         else feedback_path

@@ -35,3 +35,20 @@ OBSERVATIONS_PATH = PROCESSED_V2_DIR / "observations.csv"
 
 LEGACY_LITERATURE_PATH = DATA_DIR / "processed" / "parsed_formulations.csv"
 LEGACY_VALIDATION_PATH = DATA_DIR / "validation" / "validation_results.csv"
+
+
+def portable_source_path(
+    path: str | Path,
+    project_root: str | Path = PROJECT_ROOT,
+) -> str:
+    """Format provenance as a repository-relative POSIX path when possible."""
+
+    root = Path(project_root).resolve()
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    resolved = candidate.resolve()
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError:
+        return str(resolved)

@@ -1,0 +1,13 @@
+formulation_id,batch_id,viability_percent,intact_patch_formation_pass,evidence_kind,exclusion_reason
+v2_237544a25f30,ROUND_001,69.21,0.0,excluded_observed,missing_load
+v2_da5df4899b60,ROUND_001,43.34,0.0,excluded_observed,missing_load
+v2_21a3a498433e,ROUND_001,36.22,1.0,excluded_observed,missing_load
+v2_e0e6b16a3f20,ROUND_001,26.53,0.0,excluded_observed,missing_load
+v2_19eed4dca0d3,ROUND_001,35.84,0.0,excluded_observed,missing_load
+v2_2eead01c8392,ROUND_001,60.53,0.0,excluded_observed,missing_load
+v2_4a0cb1ead8d1,ROUND_001,60.33,0.0,excluded_observed,missing_load
+v2_6b7389efb1b5,ROUND_001,35.92,0.0,excluded_observed,missing_load
+v2_a803deb82ca6,ROUND_001,28.72,0.0,excluded_observed,missing_load
+v2_49123b81735d,ROUND_001,40.44,0.0,excluded_observed,missing_load
+v2_b9ae21107fa4,ROUND_001,15.93,0.0,excluded_observed,missing_load
+v2_a2b4c2d7b0b6,ROUND_001,24.39,0.0,excluded_observed,missing_load

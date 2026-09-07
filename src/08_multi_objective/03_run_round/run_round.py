@@ -23,6 +23,7 @@ from helper.paths import (
     OBSERVATIONS_PATH,
     NEXT_ROUND_CANDIDATES_PATH,
     NEXT_ROUND_SUMMARY_PATH,
+    portable_source_path,
     RESULTS_V2_DIR,
     TOTAL_CANDIDATE_POOL_PATH,
 )
@@ -122,15 +123,6 @@ def _read_or_empty(path: str | Path) -> pd.DataFrame:
     if path.exists() and path.stat().st_size > 0:
         return pd.read_csv(path)
     return pd.DataFrame()
-
-
-def _portable_source_path(path: str | Path) -> str:
-    """Return a stable repository-relative path when the artifact is local."""
-    resolved = Path(path).resolve()
-    try:
-        return resolved.relative_to(PROJECT_ROOT).as_posix()
-    except ValueError:
-        return str(resolved)
 
 
 # Columns that helper.feedback.ingest_feedback reads to produce new
@@ -321,7 +313,7 @@ def main() -> None:
             batch_date=args.batch_date,
             default_needles_compressed=args.default_needles_compressed,
             viability_noise=_resolve_viability_noise(optimization_config, args.viability_noise),
-            observation_source_file=_portable_source_path(round_paths.completed_csv),
+            observation_source_file=portable_source_path(round_paths.completed_csv),
         )
 
         completed_path = archive_completed(

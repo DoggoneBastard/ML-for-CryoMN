@@ -1,0 +1,80 @@
+{
+  "baseline_commit": "7e86815",
+  "verified_code_commit": "779781f",
+  "branch": "codex/v2-architecture-visualization-refactor",
+  "scope": "v2_multi_objective_only",
+  "legacy_project_modified": false,
+  "canonical_v2_tables_rewritten": false,
+  "canonical_frozen_proposals_rewritten": false,
+  "test_suite": {
+    "baseline_tests": 28,
+    "final_tests": 62,
+    "status": "passed"
+  },
+  "numeric_tolerance": {
+    "rtol": 1e-06,
+    "atol": 1e-08
+  },
+  "database": {
+    "formulations_shape": [
+      392,
+      29
+    ],
+    "observations_shape": [
+      796,
+      11
+    ],
+    "canonical_hashes_exact": true,
+    "endpoint_counts_exact": true,
+    "source_type_counts_exact": true,
+    "legacy_input_hashes_exact": true
+  },
+  "stage1_rebuild": {
+    "formulation_rows_exact": true,
+    "observation_scientific_fields_exact": true,
+    "portable_source_path_differences": 304,
+    "classification": "intended_metadata_only"
+  },
+  "round9_selection": {
+    "phase": "mechanics_bootstrap",
+    "candidate_pool_rows": 4003,
+    "candidate_pool_columns": 114,
+    "candidate_pool_text_columns_exact": 29,
+    "candidate_pool_numeric_columns_within_tolerance": 85,
+    "selected_rows": 12,
+    "proposal_columns": 132,
+    "proposal_text_and_boolean_columns_exact": 21,
+    "proposal_numeric_columns_within_tolerance": 111,
+    "candidate_ids_and_order_exact": true,
+    "selection_roles_exact": true,
+    "mechanical_flags_exact": true,
+    "mechanical_recommendation_count": 4
+  },
+  "prospective_evaluation": {
+    "metric_table_exact": true,
+    "formal_viability_n": 72,
+    "formal_viability_mae": 27.45603818528404,
+    "formal_viability_rmse": 31.627344441126034,
+    "formal_viability_bias": 25.22353261643731,
+    "formal_viability_r2": -2.3026357213110695,
+    "formal_viability_interval_95_coverage": 0.6666666666666666,
+    "formal_intact_n": 72,
+    "formal_intact_brier_score": 0.16867030790952386,
+    "formal_intact_accuracy": 0.7777777777777778,
+    "formal_mechanics_n": 0
+  },
+  "compatibility_visualization": {
+    "production_artifact_names_preserved": true,
+    "proposal_figure_dimensions": [
+      1440,
+      1080
+    ]
+  },
+  "difference_classes": {
+    "exact_match": true,
+    "within_numerical_tolerance": true,
+    "intended_metadata_only": true,
+    "intended_prototype_only": true,
+    "unexplained": []
+  }
+}
